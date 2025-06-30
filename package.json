@@ -5,7 +5,10 @@
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",
   "module": "build/module/index.js",
-  "repository": "https://github.com/oven-one/municipal-intel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oven-one/municipal-intel.git"
+  },
   "license": "MIT",
   "keywords": [
     "municipal",
