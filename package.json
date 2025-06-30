@@ -1,13 +1,29 @@
 {
-  "name": "municipal-intel",
+  "name": "@lineai/municipal-intel",
   "version": "1.0.0",
-  "description": "Local permits/planning data and intelligence",
+  "description": "Access municipal planning applications, building permits, and construction activity data from major US cities",
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",
   "module": "build/module/index.js",
   "repository": "https://github.com/oven-one/municipal-intel",
   "license": "MIT",
-  "keywords": [],
+  "keywords": [
+    "municipal",
+    "permits",
+    "building-permits",
+    "planning",
+    "construction",
+    "local-government",
+    "city-data",
+    "socrata",
+    "san-francisco",
+    "new-york-city",
+    "los-angeles",
+    "miami",
+    "orlando",
+    "tampa",
+    "typescript"
+  ],
   "scripts": {
     "build": "run-p build:*",
     "build:main": "tsc -p tsconfig.json",
@@ -36,17 +52,25 @@
     "doc:publish": "gh-pages -m \"[ci skip] Updates\" -d build/docs",
     "version": "standard-version",
     "reset-hard": "git clean -dfx && git reset --hard && yarn",
-    "prepare-release": "run-s reset-hard test cov:check doc:html version doc:publish"
+    "prepare-release": "run-s reset-hard test cov:check doc:html version doc:publish",
+    "example": "ts-node examples/basic-usage.ts",
+    "example:sf": "ts-node examples/san-francisco.ts"
   },
   "engines": {
     "node": ">=10"
   },
   "dependencies": {
-    "@bitauth/libauth": "^1.17.1"
+    "axios": "^1.7.2",
+    "zod": "^3.23.8",
+    "p-limit": "^3.1.0",
+    "node-cache": "^5.1.2",
+    "puppeteer": "^22.10.0",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@ava/typescript": "^1.1.1",
     "@istanbuljs/nyc-config-typescript": "^1.0.1",
+    "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^4.0.1",
     "@typescript-eslint/parser": "^4.0.1",
     "ava": "^3.12.1",
@@ -64,7 +88,7 @@
     "open-cli": "^6.0.1",
     "prettier": "^2.1.1",
     "standard-version": "^9.0.0",
-    "ts-node": "^9.0.0",
+    "ts-node": "^10.9.2",
     "typedoc": "^0.19.0",
     "typescript": "^4.0.2"
   },
