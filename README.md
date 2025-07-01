@@ -4,28 +4,30 @@ Access municipal planning applications, building permits, and construction activ
 
 ## Overview
 
-`@lineai/municipal-intel` provides a unified interface to access local government data from 65+ municipalities across California, New York, and Florida. It supports multiple data sources including APIs (Socrata, ArcGIS), web portals, and web scraping.
+`@lineai/municipal-intel` provides a unified interface to access local government data from major US cities. Built with TypeScript for maximum type safety, it features a hybrid architecture with built-in sources and runtime extensibility.
 
 ## Features
 
 - **Unified API**: Single interface for multiple municipal data sources
 - **Real-time Data**: Access live permit and planning application data
-- **Multiple Sources**: Support for Socrata APIs, web portals, and custom scrapers
-- **Type Safety**: Full TypeScript support with runtime validation
+- **TypeScript Native**: Built-in sources defined in TypeScript (no JSON dependencies)
+- **Runtime Extensible**: Add new cities dynamically without package updates
+- **Universal Socrata Token**: Single token works across all Socrata portals
+- **Type Safety**: Full TypeScript support with Zod schema validation
 - **Rate Limiting**: Built-in rate limiting and retry logic
-- **Caching**: Optional caching for improved performance
 
 ## Supported Cities
 
-### High Priority (API Available)
-- **California**: San Francisco, Los Angeles, San Diego, Oakland, San Jose, Sacramento
+### Built-in Sources (Ready to Use)
+- **California**: San Francisco, Los Angeles
 - **New York**: New York City (all 5 boroughs)
-- **Florida**: Miami-Dade County, Orlando, Tampa, Broward County
 
-### Medium/Low Priority
-- 50+ additional municipalities via web scraping and portals
+### Runtime Registration (Add Your Own)
+- **Any Socrata Portal**: Add any city with Socrata-based open data
+- **Custom APIs**: Register custom municipal APIs
+- **Extensible**: No package updates needed for new cities
 
-See [docs/MUNICIPAL_SOURCES.md](./docs/MUNICIPAL_SOURCES.md) for the complete list.
+See [docs/ADD_NEW_SOURCE.md](./docs/ADD_NEW_SOURCE.md) for adding new sources.
 
 ## Installation
 
@@ -40,12 +42,11 @@ import { createMunicipalIntel } from '@lineai/municipal-intel';
 
 // Create client instance
 const municipal = createMunicipalIntel({
-  debug: true,
-  socrataTokens: {
-    sf: 'your-sf-app-token',      // Optional but recommended
-    nyc: 'your-nyc-app-token'
-  }
+  debug: true
 });
+
+// Set universal Socrata token (works for all cities)
+municipal.setSocrataToken(process.env.SOCRATA_TOKEN);
 
 // Search for construction permits in San Francisco
 const results = await municipal.search({
@@ -64,24 +65,21 @@ results.projects.forEach(project => {
 
 ## Authentication
 
-### Socrata Sources (Recommended)
+### Universal Socrata Token (Recommended)
 
-For better rate limits with Socrata-based sources (San Francisco, NYC, Oakland), get free app tokens:
+Get a **single** free app token that works across **all** Socrata portals:
 
-1. **San Francisco**: Visit [data.sfgov.org](https://data.sfgov.org) → Sign up → Developer Settings
-2. **New York City**: Visit [data.cityofnewyork.us](https://data.cityofnewyork.us) → Sign up → Developer Settings
+1. Visit any Socrata portal (e.g., [data.sfgov.org](https://data.sfgov.org))
+2. Sign up → Developer Settings → Create App Token
+3. Use this **same token** for all cities!
 
 ```typescript
-const municipal = createMunicipalIntel({
-  socrataTokens: {
-    sf: process.env.SF_SOCRATA_TOKEN,
-    nyc: process.env.NYC_SOCRATA_TOKEN
-  }
-});
+const municipal = createMunicipalIntel();
+municipal.setSocrataToken(process.env.SOCRATA_TOKEN);
 ```
 
-Rate limits:
-- **With token**: 1000 requests/hour
+**Rate limits:**
+- **With token**: 1000 requests/hour per portal
 - **Without token**: Shared pool, very limited
 
 ## API Reference
@@ -147,6 +145,44 @@ const caSources = municipal.getSources({ state: 'ca' });
 ```typescript
 const health = await municipal.healthCheck('sf');
 console.log(`Status: ${health.status}, Latency: ${health.latency}ms`);
+```
+
+### Runtime Source Registration
+
+Add new cities without updating the package:
+
+```typescript
+// Register a new Florida city
+municipal.registerSource({
+  id: 'miami',
+  name: 'Miami-Dade County',
+  state: 'FL',
+  type: 'api',
+  api: {
+    type: 'socrata',
+    baseUrl: 'https://opendata.miamidade.gov',
+    datasets: {
+      buildingPermits: {
+        endpoint: '/resource/8wbx-tpnc.json',
+        name: 'Building Permits',
+        fields: ['permit_number', 'status', 'issue_date', 'address']
+      }
+    },
+    fieldMappings: {
+      id: 'permit_number',
+      status: 'status',
+      submitDate: 'issue_date',
+      address: 'address'
+    }
+  },
+  priority: 'high'
+});
+
+// Now you can search Miami data
+const miamiResults = await municipal.search({ sources: ['miami'] });
+
+// Remove runtime source
+municipal.unregisterSource('miami');
 ```
 
 ## Data Types
@@ -219,10 +255,10 @@ const localProjects = await municipal.search({
 
 ```bash
 # .env
-SF_SOCRATA_TOKEN=your-san-francisco-app-token
-NYC_SOCRATA_TOKEN=your-new-york-city-app-token
-OAKLAND_SOCRATA_TOKEN=your-oakland-app-token
+SOCRATA_TOKEN=your-universal-socrata-app-token
 ```
+
+**Note**: A single Socrata token works across **all** Socrata portals (San Francisco, NYC, Miami, etc.)
 
 ## Error Handling
 
@@ -244,16 +280,16 @@ try {
 
 ```bash
 # Install dependencies
-npm install
+yarn install
 
 # Build
-npm run build
+yarn build
 
 # Test
-npm test
+yarn test:unit
 
-# Lint
-npm run fix
+# Lint and fix
+yarn fix
 ```
 
 ## Contributing
@@ -266,7 +302,7 @@ npm run fix
 
 ## Documentation
 
-- [Municipal Sources](./docs/MUNICIPAL_SOURCES.md) - Complete list of supported municipalities
+- [Adding New Sources](./docs/ADD_NEW_SOURCE.md) - How to add new cities and data sources
 - [API Guide](./docs/MUNICIPAL_API_GUIDE.md) - Technical implementation details
 
 ## License

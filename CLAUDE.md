@@ -16,3 +16,10 @@ Based on typescript-starter template which uses co-located tests (test files adj
 - Test files are named `*.spec.ts`
 - Uses AVA test framework with TypeScript support
 - Uses NYC for coverage reporting
+
+## Git Workflow
+**CRITICAL**: NEVER work directly in the main branch
+- Always create feature branches for any changes
+- Use proper branch naming: `feat/description`, `fix/description`, `docs/description`
+- Never commit directly to main - use PRs and proper merge workflow
+- Example: `git checkout -b feat/new-feature` before making any changes
