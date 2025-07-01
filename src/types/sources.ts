@@ -60,6 +60,7 @@ export interface ApiSource {
   type: ApiType;
   baseUrl: string;
   datasets?: Record<string, SocrataDataset>;
+  endpoints?: Record<string, string>;  // For custom APIs
   fieldMappings?: Record<string, string>;
   authentication?: ApiAuth;
   rateLimit?: RateLimit;
@@ -107,7 +108,7 @@ export interface MunicipalSource {
   
   // Runtime info
   enabled?: boolean;              // Is this source active?
-  lastChecked?: Date;            // Last health check
+  lastChecked?: string;           // Last health check (ISO string)
   lastError?: string;            // Last error message
 }
 
@@ -121,6 +122,7 @@ export interface SourceRegistry {
     ca: StateSources;
     ny: StateSources;
     fl: StateSources;
+    [key: string]: StateSources;
   };
   commonFields: {
     required: string[];
@@ -169,6 +171,7 @@ export const ApiSourceSchema = z.object({
   type: z.enum(['socrata', 'arcgis', 'custom']),
   baseUrl: z.string().url(),
   datasets: z.record(SocrataDatasetSchema).optional(),
+  endpoints: z.record(z.string()).optional(),
   fieldMappings: z.record(z.string()).optional(),
   authentication: ApiAuthSchema.optional(),
   rateLimit: RateLimitSchema.optional()
@@ -204,6 +207,6 @@ export const MunicipalSourceSchema = z.object({
   priority: z.enum(['high', 'medium', 'low']),
   
   enabled: z.boolean().optional(),
-  lastChecked: z.date().optional(),
+  lastChecked: z.string().optional(),
   lastError: z.string().optional()
 });
