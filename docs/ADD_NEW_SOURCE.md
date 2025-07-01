@@ -1,13 +1,17 @@
 # Adding New Municipal Data Sources
 
-This guide walks you through adding new municipal data sources to the @lineai/municipal-intel package.
+This guide shows you **two ways** to add municipal data sources: **runtime registration** (recommended for most users) and **built-in sources** (for package contributors).
 
 ## Overview
 
-The municipal-intel package supports three types of data sources:
-- **API sources** (Socrata, ArcGIS, Custom APIs)
-- **Portal sources** (Accela, eBUILD, custom web portals)
-- **Scraping sources** (HTML scraping for static sites)
+The municipal-intel package uses a **hybrid architecture**:
+- **Built-in sources**: Pre-configured in TypeScript (SF, LA, NYC)
+- **Runtime sources**: Added dynamically by users without package updates
+
+**Data source types supported:**
+- **API sources** (Socrata, ArcGIS, Custom APIs) ✅ Ready
+- **Portal sources** (Accela, eBUILD, web portals) 🚧 Coming soon
+- **Scraping sources** (HTML scraping) 🚧 Coming soon
 
 ## Prerequisites
 
@@ -26,379 +30,233 @@ Before adding a new source, you'll need:
 
 3. **Development Environment**
    - Node.js and TypeScript setup
-   - Municipal-intel codebase cloned
    - Universal Socrata token configured (if applicable)
 
-## Step 1: Source Registry Configuration
+## Method 1: Runtime Registration (Recommended)
 
-Add your new source to `src/data/municipal-registry.json` under the appropriate state:
+**Use this approach** if you want to add a city for your own use without modifying the package.
 
-### API Source Example (Socrata)
+### Step 1: Find the Data Portal
 
-```json
-{
-  "id": "seattle",
-  "name": "Seattle",
-  "type": "api",
-  "api": {
-    "type": "socrata",
-    "baseUrl": "https://data.seattle.gov",
-    "datasets": {
-      "buildingPermits": {
-        "endpoint": "/resource/k44w-2dcq.json",
-        "name": "Building Permits",
-        "fields": ["permit_number", "application_date", "issue_date", "address", "description"]
+Look for the city's open data portal. Many cities use Socrata:
+- `data.cityname.gov` or `opendata.cityname.gov`
+- Search for "building permits" or "planning applications"
+- Note the **dataset ID** from the API URL (e.g., `/resource/abc1-def2.json`)
+
+### Step 2: Register the Source
+
+```typescript
+import { createMunicipalIntel } from '@lineai/municipal-intel';
+
+const municipal = createMunicipalIntel();
+municipal.setSocrataToken(process.env.SOCRATA_TOKEN);
+
+// Register Seattle as an example
+municipal.registerSource({
+  id: 'seattle',
+  name: 'Seattle',
+  state: 'WA',
+  type: 'api',
+  api: {
+    type: 'socrata',
+    baseUrl: 'https://data.seattle.gov',
+    datasets: {
+      buildingPermits: {
+        endpoint: '/resource/k44w-2dcq.json',
+        name: 'Building Permits',
+        fields: ['permit_number', 'application_date', 'issue_date', 'address', 'description']
       }
     },
-    "fieldMappings": {
-      "submitDate": "application_date",
-      "approvalDate": "issue_date", 
-      "value": "permit_value",
-      "address": "address",
-      "id": "permit_number",
-      "status": "status",
-      "description": "description",
-      "title": "permit_type",
-      "applicant": "contractor_name"
-    },
-    "authentication": {
-      "required": false,
-      "recommended": true,
-      "type": "app_token"
+    fieldMappings: {
+      id: 'permit_number',
+      submitDate: 'application_date', 
+      approvalDate: 'issue_date',
+      address: 'address',
+      description: 'description'
     }
   },
-  "priority": "high"
-}
+  priority: 'high'
+});
+
+// Now search Seattle data
+const results = await municipal.search({ sources: ['seattle'] });
 ```
 
-### Portal Source Example
-
-```json
-{
-  "id": "austin",
-  "name": "Austin", 
-  "type": "portal",
-  "portal": {
-    "url": "https://abc.austintexas.gov/web/permit/public-search-other",
-    "system": "accela",
-    "searchParams": {
-      "permitType": "Building",
-      "status": "All"
-    }
-  },
-  "priority": "medium"
-}
-```
-
-### Custom API Source Example
-
-```json
-{
-  "id": "boston",
-  "name": "Boston",
-  "type": "api", 
-  "api": {
-    "type": "custom",
-    "baseUrl": "https://data.boston.gov/api/3/action",
-    "endpoints": {
-      "permits": "/datastore_search?resource_id=6ddcd912-32a0-43df-9908-63574f8c7e77"
-    }
-  },
-  "priority": "high"
-}
-```
-
-## Step 2: Field Mapping Discovery
-
-Understanding the source's data structure is critical for proper field mapping.
-
-### 2.1 Explore the Data Structure
-
-Create a discovery script to understand the API:
+### Step 3: Test and Refine
 
 ```typescript
-// examples/discover-[city].ts
-import axios from 'axios';
-
-async function discoverFields() {
-  const response = await axios.get('https://data.seattle.gov/resource/k44w-2dcq.json?$limit=2');
-  
-  console.log('Sample record:');
-  console.log(JSON.stringify(response.data[0], null, 2));
-  
-  console.log('Available fields:');
-  console.log(Object.keys(response.data[0]));
-}
-```
-
-### 2.2 Create Field Mappings
-
-Map the source's field names to our normalized schema:
-
-| Logical Field | Description | Common Source Names |
-|---------------|-------------|-------------------|
-| `submitDate` | When permit was submitted/filed | `filed_date`, `application_date`, `submit_date`, `date_filed` |
-| `approvalDate` | When permit was approved/issued | `issued_date`, `approval_date`, `issuance_date`, `approved_date` |
-| `value` | Project value/cost | `estimated_cost`, `permit_value`, `project_cost`, `valuation` |
-| `address` | Project address | `address`, `street_address`, `location`, `site_address` |
-| `id` | Unique permit identifier | `permit_number`, `permit_id`, `application_id`, `id` |
-| `status` | Current permit status | `status`, `permit_status`, `state`, `current_status` |
-| `description` | Work description | `description`, `work_description`, `scope_of_work`, `project_description` |
-| `title` | Permit type/title | `permit_type`, `type`, `category`, `work_type` |
-| `applicant` | Who applied | `applicant_name`, `contractor`, `owner_name`, `permittee` |
-
-### 2.3 Handle Date Formats
-
-Different sources use different date formats. Test your date field:
-
-```bash
-# Test which date field gives recent records
-curl "https://data.seattle.gov/resource/k44w-2dcq.json?\$order=application_date desc&\$limit=1"
-```
-
-## Step 3: Implementation
-
-### 3.1 For Socrata Sources
-
-If it's a Socrata API, you're mostly done! The existing `SocrataClient` will handle it automatically once you add the registry configuration with proper field mappings.
-
-Test immediately:
-```typescript
-const municipal = createMunicipalIntel({ socrataToken: 'your-token' });
-const result = await municipal.search({ sources: ['seattle'], limit: 5 });
-```
-
-### 3.2 For Custom API Sources
-
-Create a new client class in `src/clients/[type]/`:
-
-```typescript
-// src/clients/custom/boston-client.ts
-export class BostonClient extends BaseMunicipalClient {
-  async search(params: MunicipalSearchParams): Promise<MunicipalSearchResponse> {
-    // Custom implementation for Boston's API
-  }
-  
-  async getProject(id: string): Promise<MunicipalProject | null> {
-    // Custom implementation
-  }
-}
-```
-
-Update `ClientFactory` to handle the new client type.
-
-### 3.3 For Portal Sources
-
-Implement portal scraping or automation:
-
-```typescript
-// src/clients/portal/accela-client.ts  
-export class AccelaClient extends BaseMunicipalClient {
-  async search(params: MunicipalSearchParams): Promise<MunicipalSearchResponse> {
-    // Portal automation implementation
-  }
-}
-```
-
-## Step 4: Testing
-
-### 4.1 Basic Functionality Test
-
-```typescript
-// examples/test-[city].ts
-import { createMunicipalIntel } from '../src';
-
-async function testNewSource() {
-  const municipal = createMunicipalIntel({ 
-    socrataToken: process.env.SOCRATA_TOKEN 
+// Test the source
+try {
+  const results = await municipal.search({ 
+    sources: ['seattle'], 
+    limit: 3 
   });
-
-  // Test basic search
-  const result = await municipal.search({
-    sources: ['seattle'],
-    limit: 5
+  console.log(`Found ${results.projects.length} permits from Seattle`);
+  
+  // Check field mappings work correctly
+  results.projects.forEach(project => {
+    console.log(`${project.id}: ${project.address} - ${project.status}`);
   });
-  
-  console.log(`Retrieved ${result.projects.length} projects`);
-  console.log('Sample project:', result.projects[0]);
-  
-  // Test specific project retrieval
-  if (result.projects.length > 0) {
-    const project = await municipal.getProject('seattle', result.projects[0].id);
-    console.log('Retrieved specific project:', project);
-  }
+} catch (error) {
+  console.error('Source needs refinement:', error.message);
 }
-```
 
-### 4.2 Schema Validation Test
-
-```typescript
-import { MunicipalProjectSchema } from '../src/types/projects';
-
-// Validate each project against schema
-result.projects.forEach((project, i) => {
-  const validation = MunicipalProjectSchema.safeParse(project);
-  if (!validation.success) {
-    console.log(`Project ${i} validation failed:`, validation.error.errors);
-  }
+// Adjust field mappings as needed
+municipal.unregisterSource('seattle');
+municipal.registerSource({
+  // ... updated configuration
 });
 ```
 
-### 4.3 Field Mapping Verification
-
-```typescript
-// Verify field mappings produce expected data
-const sample = result.projects[0];
-console.log('Field mapping verification:');
-console.log(`Submit Date: ${sample.submitDate} (should be recent)`);
-console.log(`Address: ${sample.address} (should be readable)`);
-console.log(`Value: ${sample.value} (should be numeric or null)`);
-```
-
-## Step 5: Quality Assurance
-
-### 5.1 Data Quality Checks
-
-- **Date Freshness**: Recent permits should appear first
-- **Address Format**: Addresses should be readable
-- **Value Consistency**: Monetary values should be reasonable
-- **Status Mapping**: Status values should be standardized
-- **Required Fields**: Core fields should not be null
-
-### 5.2 Performance Testing
-
-```typescript
-// Test rate limits and response times
-const start = Date.now();
-const results = await Promise.all([
-  municipal.search({ sources: ['seattle'], limit: 10 }),
-  municipal.search({ sources: ['seattle'], limit: 10 }),
-  municipal.search({ sources: ['seattle'], limit: 10 })
-]);
-const duration = Date.now() - start;
-
-console.log(`3 concurrent requests completed in ${duration}ms`);
-```
-
-### 5.3 Error Handling
-
-Test edge cases:
-- Empty search results  
-- Invalid project IDs
-- API downtime/errors
-- Rate limit exceeded
-- Invalid search parameters
-
-## Step 6: Documentation
-
-### 6.1 Update Registry Info
-
-Add source details to the registry metadata:
-
-```json
-{
-  "metadata": {
-    "totalSources": 31,
-    "lastUpdated": "2025-01-30"
-  }
-}
-```
-
-### 6.2 Add Source Documentation
-
-Document any source-specific quirks:
-
-```typescript
-// In source configuration, add notes
-{
-  "id": "seattle",
-  "notes": {
-    "dateFormat": "ISO 8601",
-    "updateFrequency": "daily",
-    "knownIssues": ["Permit values sometimes missing for residential"],
-    "rateLimit": "1000 requests/hour with token"
-  }
-}
-```
-
-## Step 7: Integration
-
-### 7.1 Update Tests
-
-Add test cases for the new source:
-
-```typescript
-// src/integration.spec.ts
-test('Seattle source integration', async t => {
-  const municipal = createMunicipalIntel({ socrataToken: 'test-token' });
-  const result = await municipal.search({ sources: ['seattle'], limit: 1 });
-  
-  t.is(result.projects.length, 1);
-  t.truthy(result.projects[0].id);
-  t.truthy(result.projects[0].submitDate);
-});
-```
-
-### 7.2 Update Examples
-
-Add the new source to examples:
-
-```typescript
-// examples/basic-usage.ts
-const sources = municipal.getSources({ state: 'wa' });
-console.log('Washington sources:', sources.map(s => s.name));
-```
-
-## Common Issues & Solutions
-
-### Issue: 403 Forbidden
-**Solution**: Check if API requires authentication or has IP restrictions
-
-### Issue: 404 Not Found  
-**Solution**: Verify endpoint URL and dataset ID are correct
-
-### Issue: Date Sorting Returns Old Data
-**Solution**: Use a different date field or check for null values
-
-### Issue: Field Mapping Errors
-**Solution**: Verify source field names match exactly (case-sensitive)
-
-### Issue: Rate Limited
-**Solution**: Add proper delay between requests or get API token
-
-### Issue: Schema Validation Fails
-**Solution**: Check data types and handle null values properly
-
-## Best Practices
-
-1. **Start Simple**: Begin with basic search functionality
-2. **Test Early**: Validate field mappings with real data immediately  
-3. **Handle Nulls**: Municipal data often has missing values
-4. **Date Handling**: Always test date field ordering for recent data
-5. **Error Gracefully**: Implement proper error handling and fallbacks
-6. **Document Quirks**: Note any source-specific behaviors
-7. **Monitor Quality**: Set up alerts for data quality issues
-8. **Rate Limit Respect**: Always honor API rate limits
-
-## Getting Help
-
-- Check existing source implementations in `src/data/municipal-registry.json`
-- Review `SocrataClient` for API patterns
-- Use the audit script: `npx tsx examples/audit-all-sources.ts`
-- Test with schema validation: `npx tsx examples/test-schema-validation.ts`
-
-## Checklist
-
-- [ ] Source added to registry with correct state/type
-- [ ] Field mappings tested and validated  
-- [ ] Date field returns recent data when sorted desc
-- [ ] Schema validation passes for sample data
-- [ ] Error handling implemented
-- [ ] Performance acceptable (< 2s for typical queries)
-- [ ] Documentation updated
-- [ ] Tests added
-- [ ] Integration tested with real API calls
+**That's it!** No package updates, PRs, or waiting required.
 
 ---
 
-**Next Steps**: Once your source is working, consider contributing it back to the main repository to help other developers access municipal data more easily!
+## Method 2: Built-in Sources (Package Contributors)
+
+**Use this approach** if you're contributing a commonly-requested city to the main package.
+
+### Step 1: Fork and Setup
+
+```bash
+git clone https://github.com/oven-one/municipal-intel.git
+cd municipal-intel
+yarn install
+```
+
+### Step 2: Add to Built-in Registry
+
+Edit `src/data/municipal-registry.ts` and add your source:
+
+```typescript
+// In the appropriate state section (wa, fl, etc.)
+{
+  id: "seattle",
+  name: "Seattle",
+  state: "WA",
+  type: "api",
+  api: {
+    type: "socrata",
+    baseUrl: "https://data.seattle.gov",
+    datasets: {
+      buildingPermits: {
+        endpoint: "/resource/k44w-2dcq.json",
+        name: "Building Permits",
+        fields: ["permit_number", "application_date", "issue_date", "address", "description"]
+      }
+    },
+    fieldMappings: {
+      submitDate: "application_date",
+      approvalDate: "issue_date", 
+      value: "permit_value",
+      address: "address",
+      id: "permit_number",
+      status: "status",
+      description: "description",
+      title: "permit_type",
+      applicant: "contractor_name"
+    },
+    authentication: {
+      required: false,
+      recommended: true,
+      type: "app_token"
+    }
+  },
+  priority: "high"
+}
+```
+
+### Portal Source Example (Coming Soon)
+
+```typescript
+{
+  id: "austin",
+  name: "Austin", 
+  state: "TX",
+  type: "portal",
+  portal: {
+    url: "https://abc.austintexas.gov/web/permit/public-search-other",
+    system: "accela"
+  },
+  priority: "medium"
+}
+```
+
+**Note**: Portal clients are not yet implemented. Use API sources for now.
+
+### Step 3: Test and Build
+
+```bash
+# Build the package
+yarn build
+
+# Test your new source
+yarn test:unit
+
+# Test with real data (if you have a token)
+SOCRATA_TOKEN=your-token node -e "
+const { createMunicipalIntel } = require('./build/main');
+const m = createMunicipalIntel();
+m.setSocrataToken(process.env.SOCRATA_TOKEN);
+m.search({ sources: ['seattle'], limit: 1 }).then(r => 
+  console.log('Success:', r.projects.length, 'projects')
+).catch(e => console.error('Error:', e.message));
+"
+```
+
+### Step 4: Submit PR
+
+```bash
+git checkout -b add-seattle-source
+git add src/data/municipal-registry.ts
+git commit -m "Add Seattle building permits source"
+git push origin add-seattle-source
+# Create PR on GitHub
+```
+
+---
+
+## Summary
+
+| Method | Use Case | Effort | Availability |
+|--------|----------|--------|-------------|
+| **Runtime Registration** | Personal/internal use | Low | Immediate |
+| **Built-in Sources** | Popular cities for all users | Medium | Next release |
+
+**Recommendation**: Start with runtime registration to test your source, then consider contributing it as a built-in source if it's a major city that others would benefit from.
+
+## Advanced: Custom API Example
+
+For non-Socrata APIs (runtime registration):
+
+```typescript
+municipal.registerSource({
+  id: "boston",
+  name: "Boston",
+  state: "MA",
+  type: "api",
+  api: {
+    type: "custom",
+    baseUrl: "https://api.boston.gov",
+    endpoints: {
+      permits: "/permits/search",
+      applications: "/applications/list"
+    },
+    fieldMappings: {
+      id: "permit_id",
+      status: "current_status", 
+      submitDate: "submitted_at",
+      address: "property_address"
+    }
+  },
+  priority: "high"
+});
+```
+
+**Note**: Custom API clients require additional implementation. Socrata APIs work out of the box.
+
+## Need Help?
+
+- 🐛 **Issues**: [GitHub Issues](https://github.com/oven-one/municipal-intel/issues)
+- 📖 **API Docs**: [MUNICIPAL_API_GUIDE.md](./MUNICIPAL_API_GUIDE.md)
+- 💬 **Questions**: Create a discussion on GitHub
