@@ -187,7 +187,7 @@ test('SourceRegistryManager - getImplementationReadySources returns high priorit
 
 test('SourceRegistryManager - updateSourceStatus updates source properties', t => {
   const registry = new TestRegistryManager();
-  const testDate = new Date();
+  const testDate = new Date().toISOString();
   
   // Update source status
   registry.updateSourceStatus('sf', {

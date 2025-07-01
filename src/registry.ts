@@ -3,24 +3,26 @@
  */
 
 import { SourceRegistry, MunicipalSource } from './types/sources';
-import registryData from './data/municipal-registry.json';
+import { builtInRegistry } from './data/municipal-registry';
 
 /**
  * Source registry manager
  */
 export class SourceRegistryManager {
   private registry: SourceRegistry;
+  private runtimeSources: Map<string, MunicipalSource> = new Map();
 
   constructor() {
-    this.registry = registryData as SourceRegistry;
+    this.registry = builtInRegistry;
   }
 
   /**
-   * Get all sources
+   * Get all sources (built-in + runtime)
    */
   getAllSources(): MunicipalSource[] {
     const allSources: MunicipalSource[] = [];
     
+    // Add built-in sources
     for (const state of ['ca', 'ny', 'fl'] as const) {
       const sources = this.registry.sources[state].municipalities.map(source => ({
         ...source,
@@ -28,6 +30,9 @@ export class SourceRegistryManager {
       }));
       allSources.push(...sources);
     }
+    
+    // Add runtime sources
+    allSources.push(...Array.from(this.runtimeSources.values()));
     
     return allSources;
   }
@@ -153,6 +158,70 @@ export class SourceRegistryManager {
       
       return false;
     });
+  }
+
+  /**
+   * Register a new source at runtime
+   */
+  registerSource(source: MunicipalSource): void {
+    // Validate source has required fields
+    if (!source.id || !source.name || !source.state || !source.type || !source.priority) {
+      throw new Error('Source must have id, name, state, type, and priority');
+    }
+
+    // Check for duplicate IDs
+    if (this.getSource(source.id)) {
+      throw new Error(`Source with ID '${source.id}' already exists`);
+    }
+
+    // Add to runtime sources
+    this.runtimeSources.set(source.id, {
+      ...source,
+      enabled: source.enabled !== false // Default to enabled
+    });
+  }
+
+  /**
+   * Unregister a runtime source
+   */
+  unregisterSource(id: string): boolean {
+    return this.runtimeSources.delete(id);
+  }
+
+  /**
+   * Check if a source is built-in or runtime-added
+   */
+  isBuiltInSource(id: string): boolean {
+    // Check if source exists in built-in registry
+    for (const state of ['ca', 'ny', 'fl'] as const) {
+      const found = this.registry.sources[state].municipalities.find(source => source.id === id);
+      if (found) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get only built-in sources
+   */
+  getBuiltInSources(): MunicipalSource[] {
+    const allSources: MunicipalSource[] = [];
+    
+    for (const state of ['ca', 'ny', 'fl'] as const) {
+      const sources = this.registry.sources[state].municipalities.map(source => ({
+        ...source,
+        state: state.toUpperCase()
+      }));
+      allSources.push(...sources);
+    }
+    
+    return allSources;
+  }
+
+  /**
+   * Get only runtime sources
+   */
+  getRuntimeSources(): MunicipalSource[] {
+    return Array.from(this.runtimeSources.values());
   }
 }
 

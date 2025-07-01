@@ -109,7 +109,7 @@ export class MunicipalIntel {
     
     // Update registry with health info
     this.registry.updateSourceStatus(sourceId, {
-      lastChecked: health.lastChecked,
+      lastChecked: health.lastChecked.toISOString(),
       lastError: health.status === 'unhealthy' ? health.error : undefined
     });
 
@@ -121,6 +121,27 @@ export class MunicipalIntel {
    */
   setSocrataToken(token: string): void {
     this.clientFactory.setSocrataToken(token);
+  }
+
+  /**
+   * Register a new source at runtime
+   */
+  registerSource(source: MunicipalSource): void {
+    this.registry.registerSource(source);
+  }
+
+  /**
+   * Unregister a runtime source
+   */
+  unregisterSource(id: string): boolean {
+    return this.registry.unregisterSource(id);
+  }
+
+  /**
+   * Check if a source is built-in or runtime-added
+   */
+  isBuiltInSource(id: string): boolean {
+    return this.registry.isBuiltInSource(id);
   }
 
   /**
