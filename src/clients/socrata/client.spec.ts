@@ -34,6 +34,14 @@ const mockSocrataSource: MunicipalSource = {
         fields: ['record_id', 'project_name', 'project_description']
       }
     },
+    fieldMappings: {
+      id: 'permit_number',
+      status: 'status', 
+      submitDate: 'filed_date',
+      approvalDate: 'issued_date',
+      value: 'estimated_cost',
+      title: 'permit_type'
+    },
     authentication: {
       required: false,
       recommended: true,
@@ -387,7 +395,7 @@ test('SocrataClient - buildSoQLQuery with value filters', async t => {
   const whereClause = request!.params.$where;
   
   t.truthy(whereClause, 'Should have where clause');
-  t.true(whereClause.includes('estimated_cost >= 50000'), 'Should filter by minimum value');
+  t.true(whereClause.includes('estimated_cost::number >= 50000'), 'Should filter by minimum value with number casting');
 });
 
 test('SocrataClient - buildSoQLQuery with status filters', async t => {
