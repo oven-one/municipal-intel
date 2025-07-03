@@ -1,6 +1,6 @@
 {
   "name": "@lineai/municipal-intel",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Access municipal planning applications, building permits, and construction activity data from major US cities",
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",

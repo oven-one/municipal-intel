@@ -108,7 +108,8 @@ export class SocrataClient extends BaseMunicipalClient {
    * Search for municipal projects
    */
   async search(params: MunicipalSearchParams): Promise<MunicipalSearchResponse> {
-    const soqlQuery = this.buildSoQLQuery(params);
+    const adjustments: string[] = [];
+    const soqlQuery = this.buildSoQLQuery(params, adjustments);
     const dataset = this.getPrimaryDataset();
 
     const data = await this.query(dataset, soqlQuery);
@@ -127,7 +128,8 @@ export class SocrataClient extends BaseMunicipalClient {
       total,
       page: Math.floor((params.offset || 0) / (params.limit || 100)) + 1,
       pageSize: params.limit || 100,
-      hasMore: total > (params.offset || 0) + projects.length
+      hasMore: total > (params.offset || 0) + projects.length,
+      adjustments
     };
   }
 
@@ -137,6 +139,13 @@ export class SocrataClient extends BaseMunicipalClient {
   async getProject(id: string): Promise<MunicipalProject | null> {
     const dataset = this.getPrimaryDataset();
     const idField = this.getIdField();
+
+    if (!idField) {
+      throw new MunicipalDataError(
+        `Missing field mapping for 'id' in source ${this.source.id}. Please add to fieldMappings in registry.`,
+        this.source.id
+      );
+    }
 
     const query: SoQLQuery = {
       $where: `${idField} = '${id.replace(`${this.source.id}-`, '')}'`,
@@ -192,7 +201,7 @@ export class SocrataClient extends BaseMunicipalClient {
   /**
    * Build SoQL query from search parameters
    */
-  private buildSoQLQuery(params: MunicipalSearchParams): SoQLQuery {
+  private buildSoQLQuery(params: MunicipalSearchParams, adjustments: string[]): SoQLQuery {
     const query: SoQLQuery = {
       $limit: params.limit || 100,
       $offset: params.offset || 0,
@@ -220,7 +229,11 @@ export class SocrataClient extends BaseMunicipalClient {
     if (params.minValue) {
       const field = this.getValueField();
       if (field) {
-        whereConditions.push(`${field} >= ${params.minValue}`);
+        // All Socrata sources store numeric values as text strings, requires casting
+        whereConditions.push(`${field}::number >= ${params.minValue}`);
+      } else {
+        // No value field available - skip filter and record adjustment
+        adjustments.push(`${this.source.id.toUpperCase()}: Skipped minValue filter - no value field available in dataset`);
       }
     }
 
@@ -325,52 +338,55 @@ export class SocrataClient extends BaseMunicipalClient {
   }
 
   /**
-   * Get field mapping for this source
+   * Get field mapping for this source (returns null if missing)
    */
-  private getFieldMapping(logicalField: string): string {
-    // Read field mappings from source configuration
+  private getFieldMapping(logicalField: string): string | null {
     const mappings = this.source.api?.fieldMappings;
-    if (mappings && mappings[logicalField]) {
-      return mappings[logicalField];
-    }
-    
-    // No fallback - all sources must have complete field mappings
-    throw new MunicipalDataError(
-      `Missing field mapping for '${logicalField}' in source ${this.source.id}. Please add to fieldMappings in registry.`,
-      this.source.id
-    );
+    return mappings?.[logicalField] || null;
   }
 
   // Placeholder methods - would be implemented per source
-  private getIdField(): string { return 'permit_number'; }
-  private getTypeField(): string | null { return 'permit_type'; }
+  private getIdField(): string | null { return this.getFieldMapping('id'); }
+  private getTypeField(): string | null { return this.getFieldMapping('title'); }
   private getDateField(type: 'submit' | 'approval'): string | null {
     return type === 'submit' 
       ? this.getFieldMapping('submitDate') 
       : this.getFieldMapping('approvalDate');
   }
-  private getValueField(): string | null { return 'estimated_cost'; }
-  private getStatusField(): string | null { return 'status'; }
-  private getAddressField(): string | null { return 'street_name'; }
+  private getValueField(): string | null { 
+    const mappings = this.source.api?.fieldMappings;
+    return mappings?.value || null;
+  }
+  private getStatusField(): string | null { return this.getFieldMapping('status'); }
+  private getAddressField(): string | null { return this.getFieldMapping('address'); }
 
   /**
    * Normalize raw data to MunicipalProject
    * This would be implemented per source
    */
   private normalizeProject(data: any): MunicipalProject {
-    // Simplified normalization - each source would implement this
+    // Get field mappings safely
+    const idField = this.getFieldMapping('id');
+    const titleField = this.getFieldMapping('title');
+    const statusField = this.getFieldMapping('status');
+    const submitDateField = this.getFieldMapping('submitDate');
+    const approvalDateField = this.getFieldMapping('approvalDate');
+    const valueField = this.getFieldMapping('value');
+    const applicantField = this.getFieldMapping('applicant');
+    const descriptionField = this.getFieldMapping('description');
+
     return {
-      id: `${this.source.id}-${data[this.getFieldMapping('id')] || 'unknown'}`,
+      id: `${this.source.id}-${idField ? data[idField] || 'unknown' : 'unknown'}`,
       source: this.source.id,
       type: 'permit',
-      title: data[this.getFieldMapping('title')] || 'Building Permit',
+      title: titleField ? data[titleField] || 'Building Permit' : 'Building Permit',
       address: this.buildAddress(data),
-      status: this.mapStatus(data[this.getFieldMapping('status')]),
-      submitDate: this.parseDate(data[this.getFieldMapping('submitDate')]),
-      approvalDate: data[this.getFieldMapping('approvalDate')] ? this.parseDate(data[this.getFieldMapping('approvalDate')]) : undefined,
-      value: data[this.getFieldMapping('value')] ? parseFloat(data[this.getFieldMapping('value')]) : undefined,
-      applicant: data[this.getFieldMapping('applicant')],
-      description: data[this.getFieldMapping('description')],
+      status: this.mapStatus(statusField ? data[statusField] : null),
+      submitDate: this.parseDate(submitDateField ? data[submitDateField] : null),
+      approvalDate: approvalDateField && data[approvalDateField] ? this.parseDate(data[approvalDateField]) : undefined,
+      value: valueField && data[valueField] ? parseFloat(data[valueField]) : undefined,
+      applicant: applicantField ? data[applicantField] : undefined,
+      description: descriptionField ? data[descriptionField] : undefined,
       rawData: data,
       lastUpdated: new Date()
     };

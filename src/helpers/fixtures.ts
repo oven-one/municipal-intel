@@ -87,7 +87,8 @@ export const sampleSearchResponse: MunicipalSearchResponse = {
   total: 2,
   page: 1,
   pageSize: 10,
-  hasMore: false
+  hasMore: false,
+  adjustments: []
 };
 
 export const invalidProjectData = {

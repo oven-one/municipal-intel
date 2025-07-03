@@ -129,6 +129,7 @@ export interface MunicipalSearchResponse {
   page: number;
   pageSize: number;
   hasMore: boolean;
+  adjustments: string[];  // Messages about query modifications made during search
 }
 
 /**
