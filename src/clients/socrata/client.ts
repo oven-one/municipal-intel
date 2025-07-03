@@ -201,7 +201,7 @@ export class SocrataClient extends BaseMunicipalClient {
   /**
    * Build SoQL query from search parameters
    */
-  private buildSoQLQuery(params: MunicipalSearchParams, adjustments: string[]): SoQLQuery {
+  private buildSoQLQuery(params: MunicipalSearchParams, adjustments: string[] = []): SoQLQuery {
     const query: SoQLQuery = {
       $limit: params.limit || 100,
       $offset: params.offset || 0,
@@ -334,6 +334,10 @@ export class SocrataClient extends BaseMunicipalClient {
     const order = params.sortOrder || 'desc';
 
     const field = this.getFieldMapping(sortBy);
+    if (!field) {
+      // If field mapping not available, try to use a default field or skip ordering
+      return `:created_at ${order}`; // Most Socrata datasets have this system field
+    }
     return `${field} ${order}`;
   }
 
