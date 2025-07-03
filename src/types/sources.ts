@@ -31,6 +31,7 @@ export interface SocrataDataset {
   endpoint: string;      // e.g., "/resource/i98e-djp9.json"
   name: string;          // Human-readable name
   fields: string[];      // Available fields
+  fieldMappings?: Record<string, string>; // Mapping from logical fields to dataset fields
 }
 
 /**
@@ -61,7 +62,6 @@ export interface ApiSource {
   baseUrl: string;
   datasets?: Record<string, SocrataDataset>;
   endpoints?: Record<string, string>;  // For custom APIs
-  fieldMappings?: Record<string, string>;
   authentication?: ApiAuth;
   rateLimit?: RateLimit;
 }
@@ -164,7 +164,8 @@ export const RateLimitSchema = z.object({
 export const SocrataDatasetSchema = z.object({
   endpoint: z.string(),
   name: z.string(),
-  fields: z.array(z.string())
+  fields: z.array(z.string()),
+  fieldMappings: z.record(z.string()).optional()
 });
 
 export const ApiSourceSchema = z.object({
@@ -172,7 +173,6 @@ export const ApiSourceSchema = z.object({
   baseUrl: z.string().url(),
   datasets: z.record(SocrataDatasetSchema).optional(),
   endpoints: z.record(z.string()).optional(),
-  fieldMappings: z.record(z.string()).optional(),
   authentication: ApiAuthSchema.optional(),
   rateLimit: RateLimitSchema.optional()
 });

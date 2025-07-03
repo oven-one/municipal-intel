@@ -201,7 +201,7 @@ test('MunicipalIntel - search with specific sources', async t => {
   mockHttpClient.mockSuccess('/resource/i98e-djp9.json', mockSocrataResponses.buildingPermits);
   
   const result = await municipal.search({
-    sources: ['sf'],
+    municipalityId: 'sf',
     limit: 5
   });
   
@@ -214,23 +214,25 @@ test('MunicipalIntel - search with no available sources throws error', async t =
   
   const error = await t.throwsAsync(async () => {
     await municipal.search({
-      sources: ['nonexistent-source']
+      municipalityId: 'nonexistent-source' as any
     });
   });
   
-  assertError(t, error!, 'No available sources for search');
+  assertError(t, error!, 'Municipality not found');
 });
 
-test('MunicipalIntel - search with empty source list throws error', async t => {
-  const { municipal } = createMunicipalWithMockClient();
+test('MunicipalIntel - search without municipalityId uses first available source', async t => {
+  const { municipal, mockHttpClient } = createMunicipalWithMockClient();
   
-  const error = await t.throwsAsync(async () => {
-    await municipal.search({
-      sources: []
-    });
+  mockHttpClient.mockSuccess('/resource/i98e-djp9.json', mockSocrataResponses.buildingPermits);
+  
+  const result = await municipal.search({
+    // No municipalityId provided - should use first available source
+    limit: 5
   });
   
-  assertError(t, error!, 'No available sources for search');
+  t.truthy(result, 'Should return search results using first available source');
+  t.true(result.pageSize <= 5, 'Should respect limit parameter');
 });
 
 test('MunicipalIntel - getProject finds project by ID', async t => {
@@ -347,9 +349,9 @@ test('MunicipalIntel - concurrent searches', async t => {
   
   // Execute multiple searches concurrently
   const searches = [
-    municipal.search({ sources: ['sf'], limit: 5 }),
-    municipal.search({ sources: ['sf'], limit: 10 }),
-    municipal.search({ sources: ['sf'], limit: 3 })
+    municipal.search({ municipalityId: 'sf', limit: 5 }),
+    municipal.search({ municipalityId: 'sf', limit: 10 }),
+    municipal.search({ municipalityId: 'sf', limit: 3 })
   ];
   
   const results = await Promise.all(searches);
@@ -391,7 +393,7 @@ test('MunicipalIntel - integration with real source types', async t => {
   // Test that we get appropriate errors for unimplemented types
   if (portalSources.length > 0) {
     const error = await t.throwsAsync(async () => {
-      await municipal.search({ sources: [portalSources[0].id] });
+      await municipal.search({ municipalityId: portalSources[0].id as any });
     });
     
     assertError(t, error!, 'Portal clients not yet implemented');

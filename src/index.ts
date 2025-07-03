@@ -17,7 +17,7 @@ export * from './registry';
 // Main API class
 import { ClientFactory, ClientFactoryConfig } from './clients';
 import { sourceRegistry, SourceRegistryManager } from './registry';
-import { MunicipalSource, MunicipalProject, MunicipalSearchParams, MunicipalSearchResponse } from './types';
+import { MunicipalSource, MunicipalProject, MunicipalSearchParams, MunicipalSearchResponse, MunicipalityInfo, SearchCapabilities, FieldSchema, KnownMunicipalityId } from './types';
 
 /**
  * Main municipal intelligence API
@@ -32,22 +32,28 @@ export class MunicipalIntel {
   }
 
   /**
-   * Search across multiple municipal sources
+   * Search municipal projects
    */
-  async search(params: MunicipalSearchParams & { sources?: string[] }): Promise<MunicipalSearchResponse> {
-    const sources = params.sources 
-      ? params.sources.map(id => this.registry.getSource(id)).filter(Boolean) as MunicipalSource[]
-      : this.registry.getImplementationReadySources();
+  async search(params: MunicipalSearchParams): Promise<MunicipalSearchResponse> {
+    let source: MunicipalSource;
 
-    if (sources.length === 0) {
-      throw new Error('No available sources for search');
+    if (params.municipalityId) {
+      // Search specific municipality
+      const foundSource = this.registry.getSource(params.municipalityId);
+      if (!foundSource) {
+        throw new Error(`Municipality not found: ${params.municipalityId}`);
+      }
+      source = foundSource;
+    } else {
+      // Default to first available source if no municipality specified
+      const sources = this.registry.getImplementationReadySources();
+      if (sources.length === 0) {
+        throw new Error('No available sources for search');
+      }
+      source = sources[0];
     }
 
-    // For now, search the first available source
-    // TODO: Implement multi-source aggregation
-    const source = sources[0];
     const client = this.clientFactory.createClient(source);
-    
     return client.search(params);
   }
 
@@ -62,6 +68,108 @@ export class MunicipalIntel {
 
     const client = this.clientFactory.createClient(source);
     return client.getProject(projectId);
+  }
+
+  /**
+   * Get available municipalities with their datasets (AI Discovery API)
+   */
+  getAvailableMunicipalities(): MunicipalityInfo[] {
+    const sources = this.registry.getAllSources();
+    
+    return sources.map(source => ({
+      id: source.id as KnownMunicipalityId,
+      name: source.name,
+      state: source.state,
+      datasets: source.api?.datasets 
+        ? Object.entries(source.api.datasets).map(([id, dataset]) => ({
+            id,
+            name: dataset.name
+          }))
+        : []
+    }));
+  }
+
+  /**
+   * Get search capabilities for a municipality
+   */
+  getSearchCapabilities(municipalityId: KnownMunicipalityId): SearchCapabilities {
+    const source = this.registry.getSource(municipalityId);
+    if (!source) {
+      throw new Error(`Municipality not found: ${municipalityId}`);
+    }
+
+    // For now, return capabilities based on what our Socrata client supports
+    // This could be enhanced to be source-specific
+    const supportedFilters: any[] = ['submitDateFrom', 'submitDateTo', 'statuses', 'addresses', 'keywords'];
+    const supportedSorts: any[] = ['submitDate', 'address'];
+    const limitations: string[] = [];
+
+    // Check if value field is available for value filters
+    if (source.api?.datasets) {
+      const primaryDataset = Object.values(source.api.datasets)[0];
+      if (primaryDataset?.fieldMappings?.value) {
+        supportedFilters.push('minValue', 'maxValue');
+        supportedSorts.push('value');
+      } else {
+        limitations.push('No value field available - minValue/maxValue filters not supported');
+      }
+      
+      // Check if approval date is available
+      if (primaryDataset?.fieldMappings?.approvalDate) {
+        supportedFilters.push('approvalDateFrom', 'approvalDateTo');
+        supportedSorts.push('approvalDate');
+      }
+    }
+
+    return {
+      supportedFilters,
+      supportedSorts,
+      limitations: limitations.length > 0 ? limitations : undefined
+    };
+  }
+
+  /**
+   * Get field schema for a dataset
+   */
+  getDatasetSchema(municipalityId: KnownMunicipalityId, datasetId?: string): FieldSchema[] {
+    const source = this.registry.getSource(municipalityId);
+    if (!source || !source.api?.datasets) {
+      throw new Error(`Municipality or datasets not found: ${municipalityId}`);
+    }
+
+    // Get the specified dataset or the first one
+    const dataset = datasetId 
+      ? source.api.datasets[datasetId]
+      : Object.values(source.api.datasets)[0];
+      
+    if (!dataset) {
+      throw new Error(`Dataset not found: ${datasetId || 'default'}`);
+    }
+
+    // Convert fields to schema format
+    const fieldMappings = dataset.fieldMappings || {};
+    const searchableLogicalFields = Object.keys(fieldMappings);
+
+    return dataset.fields.map(fieldName => {
+      const isSearchable = Object.values(fieldMappings).includes(fieldName);
+      
+      // Determine field type based on field name patterns
+      let type: any = 'string';
+      if (fieldName.includes('date') || fieldName.includes('_date')) {
+        type = 'date';
+      } else if (fieldName.includes('cost') || fieldName.includes('value') || fieldName.includes('amount')) {
+        type = 'number';
+      }
+
+      return {
+        name: fieldName,
+        type,
+        searchable: isSearchable,
+        description: isSearchable 
+          ? `Searchable field mapped to: ${searchableLogicalFields.find(logical => fieldMappings[logical] === fieldName)}`
+          : undefined
+      };
+    });
   }
 
   /**

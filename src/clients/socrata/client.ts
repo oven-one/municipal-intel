@@ -214,14 +214,20 @@ export class SocrataClient extends BaseMunicipalClient {
     if (params.submitDateFrom) {
       const field = this.getDateField('submit');
       if (field) {
-        whereConditions.push(`${field} >= '${params.submitDateFrom.toISOString()}'`);
+        this.validateDateParameter(params.submitDateFrom, 'submitDateFrom');
+        // Socrata doesn't like Z timezone indicator, remove it
+        const dateString = params.submitDateFrom.toISOString().replace('Z', '');
+        whereConditions.push(`${field} >= '${dateString}'`);
       }
     }
 
     if (params.submitDateTo) {
       const field = this.getDateField('submit');
       if (field) {
-        whereConditions.push(`${field} <= '${params.submitDateTo.toISOString()}'`);
+        this.validateDateParameter(params.submitDateTo, 'submitDateTo');
+        // Socrata doesn't like Z timezone indicator, remove it
+        const dateString = params.submitDateTo.toISOString().replace('Z', '');
+        whereConditions.push(`${field} <= '${dateString}'`);
       }
     }
 
@@ -345,7 +351,10 @@ export class SocrataClient extends BaseMunicipalClient {
    * Get field mapping for this source (returns null if missing)
    */
   private getFieldMapping(logicalField: string): string | null {
-    const mappings = this.source.api?.fieldMappings;
+    const dataset = this.getPrimaryDataset();
+    const apiSource = this.source.api as ApiSource;
+    const datasetConfig = apiSource.datasets?.[dataset];
+    const mappings = datasetConfig?.fieldMappings;
     return mappings?.[logicalField] || null;
   }
 
@@ -358,8 +367,7 @@ export class SocrataClient extends BaseMunicipalClient {
       : this.getFieldMapping('approvalDate');
   }
   private getValueField(): string | null { 
-    const mappings = this.source.api?.fieldMappings;
-    return mappings?.value || null;
+    return this.getFieldMapping('value');
   }
   private getStatusField(): string | null { return this.getFieldMapping('status'); }
   private getAddressField(): string | null { return this.getFieldMapping('address'); }
@@ -376,7 +384,6 @@ export class SocrataClient extends BaseMunicipalClient {
     const submitDateField = this.getFieldMapping('submitDate');
     const approvalDateField = this.getFieldMapping('approvalDate');
     const valueField = this.getFieldMapping('value');
-    const applicantField = this.getFieldMapping('applicant');
     const descriptionField = this.getFieldMapping('description');
 
     return {
@@ -389,11 +396,30 @@ export class SocrataClient extends BaseMunicipalClient {
       submitDate: this.parseDate(submitDateField ? data[submitDateField] : null),
       approvalDate: approvalDateField && data[approvalDateField] ? this.parseDate(data[approvalDateField]) : undefined,
       value: valueField && data[valueField] ? parseFloat(data[valueField]) : undefined,
-      applicant: applicantField ? data[applicantField] : undefined,
       description: descriptionField ? data[descriptionField] : undefined,
       rawData: data,
       lastUpdated: new Date()
     };
+  }
+
+  /**
+   * Validate that date parameter is a proper Date object
+   */
+  private validateDateParameter(dateParam: any, paramName: string): void {
+    if (!(dateParam instanceof Date)) {
+      const actualType = Array.isArray(dateParam) ? 'array' : typeof dateParam;
+      throw new MunicipalDataError(
+        `Invalid ${paramName}: expected Date object, got ${actualType}. Use: new Date('2024-01-01') or new Date()`,
+        this.source.id
+      );
+    }
+    
+    if (isNaN(dateParam.getTime())) {
+      throw new MunicipalDataError(
+        `Invalid ${paramName}: Date object contains invalid date. Check your date values.`,
+        this.source.id
+      );
+    }
   }
 
   /**

@@ -5,6 +5,36 @@
 import { z } from 'zod';
 
 /**
+ * Known municipality IDs - strongly typed for built-in municipalities
+ */
+export type KnownMunicipalityId = 'sf' | 'nyc' | 'la';
+
+/**
+ * Valid search filter parameters
+ */
+export type ValidSearchFilter = 
+  | 'minValue' 
+  | 'maxValue' 
+  | 'submitDateFrom' 
+  | 'submitDateTo' 
+  | 'approvalDateFrom' 
+  | 'approvalDateTo' 
+  | 'statuses' 
+  | 'addresses' 
+  | 'zipCodes' 
+  | 'keywords';
+
+/**
+ * Valid sort field options
+ */
+export type ValidSortField = 'submitDate' | 'approvalDate' | 'value' | 'address';
+
+/**
+ * Valid field data types
+ */
+export type ValidFieldType = 'string' | 'number' | 'date';
+
+/**
  * Type of municipal project
  */
 export type ProjectType = 'permit' | 'planning' | 'construction' | 'renovation' | 'demolition';
@@ -91,8 +121,7 @@ export interface MunicipalProject {
  */
 export interface MunicipalSearchParams {
   // Location filters
-  states?: string[];       // State codes (e.g., ['CA', 'NY'])
-  cities?: string[];       // City names or codes
+  municipalityId?: KnownMunicipalityId; // Municipality ID ('sf', 'nyc', 'la')
   addresses?: string[];    // Specific addresses
   zipCodes?: string[];     // ZIP codes
   
@@ -118,6 +147,38 @@ export interface MunicipalSearchParams {
   // Sorting
   sortBy?: 'submitDate' | 'approvalDate' | 'value' | 'address';
   sortOrder?: 'asc' | 'desc';
+}
+
+/**
+ * Municipality information for discovery
+ */
+export interface MunicipalityInfo {
+  id: KnownMunicipalityId;
+  name: string;
+  state: string;
+  datasets: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
+/**
+ * Search capabilities for a municipality
+ */
+export interface SearchCapabilities {
+  supportedFilters: ValidSearchFilter[];
+  supportedSorts: ValidSortField[];
+  limitations?: string[];
+}
+
+/**
+ * Field schema information
+ */
+export interface FieldSchema {
+  name: string;
+  type: ValidFieldType;
+  searchable: boolean;
+  description?: string;
 }
 
 /**
