@@ -8,13 +8,22 @@ Access municipal planning applications, building permits, and construction activ
 
 ## Features
 
+### AI-First Design
+- **Discovery API**: Comprehensive discovery methods for AI assistants
+- **Strong Typing**: TypeScript autocomplete for municipality IDs and search parameters
+- **Search Capabilities**: Dynamic capability detection per municipality
+- **Self-Documenting**: Rich metadata about available datasets and fields
+
+### Data Access
 - **Unified API**: Single interface for multiple municipal data sources
 - **Real-time Data**: Access live permit and planning application data
-- **TypeScript Native**: Built-in sources defined in TypeScript (no JSON dependencies)
+- **Transparent Adjustments**: Best-effort queries with clear reporting of any modifications
+- **Schema Validation**: Zod schemas ensure data consistency and catch API changes
+
+### Developer Experience
+- **TypeScript Native**: Built-in sources with full type safety
 - **Runtime Extensible**: Add new cities dynamically without package updates
 - **Universal Socrata Token**: Single token works across all Socrata portals
-- **Transparent Adjustments**: Best-effort queries with clear reporting of any modifications
-- **Type Safety**: Full TypeScript support with Zod schema validation
 - **Rate Limiting**: Built-in rate limiting and retry logic
 
 ## Supported Cities
@@ -49,11 +58,18 @@ const municipal = createMunicipalIntel({
 // Set universal Socrata token (works for all cities)
 municipal.setSocrataToken(process.env.SOCRATA_TOKEN);
 
+// 🤖 AI Discovery: Find what's available
+const municipalities = municipal.getAvailableMunicipalities();
+console.log('Available municipalities:', municipalities);
+
+// Check search capabilities for San Francisco
+const capabilities = municipal.getSearchCapabilities('sf');
+console.log('SF supports:', capabilities.supportedFilters);
+
 // Search for construction permits in San Francisco
 const results = await municipal.search({
-  sources: ['sf'],
-  types: ['permit', 'construction'],
-  keywords: ['renovation', 'construction'],
+  municipalityId: 'sf',        // Type-safe municipality ID
+  keywords: ['renovation'],
   minValue: 100000,
   limit: 10
 });
@@ -62,6 +78,11 @@ console.log(`Found ${results.total} projects`);
 results.projects.forEach(project => {
   console.log(`${project.title} - ${project.address} - $${project.value}`);
 });
+
+// Check for any query adjustments
+if (results.adjustments.length > 0) {
+  console.log('Query adjustments:', results.adjustments);
+}
 ```
 
 ## Authentication
@@ -85,14 +106,28 @@ municipal.setSocrataToken(process.env.SOCRATA_TOKEN);
 
 ## API Reference
 
+### 🤖 AI Discovery Methods
+
+```typescript
+// Get all available municipalities with their datasets
+const municipalities = municipal.getAvailableMunicipalities();
+// Returns: [{ id: 'sf', name: 'San Francisco', state: 'CA', datasets: [...] }]
+
+// Check what search capabilities a municipality supports
+const capabilities = municipal.getSearchCapabilities('sf');
+// Returns: { supportedFilters: ['minValue', 'submitDate', ...], limitations: [...] }
+
+// Get detailed field schema for a dataset
+const schema = municipal.getDatasetSchema('sf', 'buildingPermits');
+// Returns: [{ name: 'permit_number', type: 'string', searchable: true }]
+```
+
 ### Search Projects
 
 ```typescript
 const results = await municipal.search({
-  // Location filters
-  sources: ['sf', 'nyc'],           // Specific sources
-  states: ['CA', 'NY'],             // By state
-  cities: ['San Francisco'],        // By city name
+  // Location filters  
+  municipalityId: 'sf',             // Type-safe municipality ('sf' | 'nyc' | 'la')
   addresses: ['Market Street'],     // By address
   zipCodes: ['94102'],             // By ZIP code
   
@@ -105,7 +140,7 @@ const results = await municipal.search({
   submitDateFrom: new Date('2024-01-01'),
   submitDateTo: new Date('2024-12-31'),
   
-  // Value filters
+  // Value filters (if supported by municipality)
   minValue: 50000,
   maxValue: 1000000,
   
@@ -117,6 +152,9 @@ const results = await municipal.search({
   sortBy: 'submitDate',
   sortOrder: 'desc'
 });
+
+// Check for query adjustments
+console.log('Adjustments:', results.adjustments);
 ```
 
 ### Get Specific Project
@@ -166,21 +204,23 @@ municipal.registerSource({
       buildingPermits: {
         endpoint: '/resource/8wbx-tpnc.json',
         name: 'Building Permits',
-        fields: ['permit_number', 'status', 'issue_date', 'address']
+        fields: ['permit_number', 'status', 'issue_date', 'address', 'valuation', 'description'],
+        fieldMappings: {
+          id: 'permit_number',
+          status: 'status',
+          submitDate: 'issue_date',
+          address: 'address',
+          value: 'valuation',
+          description: 'description'
+        }
       }
-    },
-    fieldMappings: {
-      id: 'permit_number',
-      status: 'status',
-      submitDate: 'issue_date',
-      address: 'address'
     }
   },
   priority: 'high'
 });
 
 // Now you can search Miami data
-const miamiResults = await municipal.search({ sources: ['miami'] });
+const miamiResults = await municipal.search({ municipalityId: 'miami' });
 
 // Remove runtime source
 municipal.unregisterSource('miami');
@@ -291,38 +331,76 @@ interface MunicipalProject {
 ### Monitor New Permits
 
 ```typescript
-// Get recent permits from multiple sources
+// Get recent permits from San Francisco
 const recent = await municipal.search({
-  sources: ['sf', 'nyc', 'la'],
+  municipalityId: 'sf',
   types: ['permit'],
   submitDateFrom: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
   sortBy: 'submitDate',
   sortOrder: 'desc'
 });
+
+// Monitor multiple municipalities separately
+const municipalities = municipal.getAvailableMunicipalities();
+for (const municipality of municipalities) {
+  const permits = await municipal.search({
+    municipalityId: municipality.id,
+    types: ['permit'],
+    submitDateFrom: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    limit: 5
+  });
+  console.log(`${municipality.name}: ${permits.total} recent permits`);
+}
 ```
 
 ### Construction Projects by Value
 
 ```typescript
-// High-value construction projects
+// High-value construction projects in SF (value filtering supported)
 const bigProjects = await municipal.search({
+  municipalityId: 'sf',
   types: ['construction', 'renovation'],
   minValue: 1000000,
   statuses: ['approved', 'issued'],
   sortBy: 'value',
   sortOrder: 'desc'
 });
+
+// Check which municipalities support value filtering
+const municipalities = municipal.getAvailableMunicipalities();
+for (const municipality of municipalities) {
+  const capabilities = municipal.getSearchCapabilities(municipality.id);
+  if (capabilities.supportedFilters.includes('minValue')) {
+    console.log(`${municipality.name} supports value filtering`);
+  }
+}
 ```
 
 ### Geographic Search
 
 ```typescript
-// Projects in specific area
+// Projects in specific SF area
 const localProjects = await municipal.search({
+  municipalityId: 'sf',
   addresses: ['Market Street', 'Mission Street'],
   zipCodes: ['94102', '94103'],
   limit: 20
 });
+
+// Cross-municipality geographic search
+const addressSearch = async (streetName: string) => {
+  const municipalities = municipal.getAvailableMunicipalities();
+  for (const municipality of municipalities) {
+    const results = await municipal.search({
+      municipalityId: municipality.id,
+      addresses: [streetName],
+      limit: 3
+    });
+    console.log(`${municipality.name}: ${results.total} projects on ${streetName}`);
+  }
+};
+
+await addressSearch('Main Street');
 ```
 
 ## Environment Variables
@@ -358,7 +436,7 @@ try {
 ```typescript
 // This might fail with "Invalid SoQL query" error
 const results = await municipal.search({
-  sources: ['sf'],
+  municipalityId: 'sf',
   minValue: 100000  // 400 error
 });
 ```
@@ -372,7 +450,7 @@ const results = await municipal.search({
 **Problem**: Some sources don't return value information
 ```typescript
 const results = await municipal.search({
-  sources: ['nyc'],
+  municipalityId: 'nyc',
   minValue: 100000
 });
 // NYC projects show value: null
@@ -401,13 +479,21 @@ municipal.setSocrataToken(process.env.SOCRATA_TOKEN);
 **Solution**: Verify field mappings match actual API response:
 
 1. Check the API samples in `/api-samples/` directory
-2. Ensure your `fieldMappings` use correct field names
+2. Ensure your `fieldMappings` use correct field names at the dataset level
 3. Use the library's field discovery tools
 
 ```typescript
 // Check available fields for your source
 const source = municipal.getSource('your-city');
 console.log('Available fields:', source.api?.datasets?.buildingPermits?.fields);
+
+// Check what fields are mapped
+const fieldMappings = source.api?.datasets?.buildingPermits?.fieldMappings;
+console.log('Field mappings:', fieldMappings);
+
+// Use schema discovery to validate
+const schema = municipal.getDatasetSchema('your-city', 'buildingPermits');
+console.log('Schema:', schema);
 ```
 
 ## Development
