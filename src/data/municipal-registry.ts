@@ -35,7 +35,7 @@ export const builtInRegistry: SourceRegistry = {
             fieldMappings: {
               submitDate: "permit_creation_date",
               approvalDate: "issued_date",
-              value: "estimated_cost",
+              value: "estimated_cost", // TEXT field - requires special handling for numeric comparisons
               address: "street_name",
               id: "permit_number",
               status: "status",
@@ -79,7 +79,7 @@ export const builtInRegistry: SourceRegistry = {
             fieldMappings: {
               submitDate: "issue_date",
               approvalDate: "issue_date",
-              value: "valuation_amount",
+              value: "valuation",
               address: "street_name",
               id: "pcis_permit",
               status: "latest_status",
@@ -123,7 +123,7 @@ export const builtInRegistry: SourceRegistry = {
             fieldMappings: {
               submitDate: "filing_date",
               approvalDate: "issuance_date",
-              value: "estimated_job_cost",
+              // value: No value/cost field available in this dataset
               address: "street_name",
               id: "permit_si_no",
               status: "permit_status",
