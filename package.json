@@ -1,6 +1,6 @@
 {
   "name": "@lineai/municipal-intel",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "AI-first municipal data API providing natural language descriptions of building permits and planning applications from major US cities",
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",
