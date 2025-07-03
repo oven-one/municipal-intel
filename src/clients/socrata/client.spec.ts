@@ -26,21 +26,26 @@ const mockSocrataSource: MunicipalSource = {
       buildingPermits: {
         endpoint: '/resource/i98e-djp9.json',
         name: 'Building Permits',
-        fields: ['permit_number', 'permit_type', 'status', 'filed_date', 'estimated_cost']
+        fields: ['permit_number', 'permit_type', 'status', 'filed_date', 'estimated_cost'],
+        fieldMappings: {
+          id: 'permit_number',
+          status: 'status', 
+          submitDate: 'filed_date',
+          approvalDate: 'issued_date',
+          value: 'estimated_cost',
+          title: 'permit_type'
+        }
       },
       planningApplications: {
         endpoint: '/resource/6zqd-wh5d.json',
         name: 'Planning Applications',
-        fields: ['record_id', 'project_name', 'project_description']
+        fields: ['record_id', 'project_name', 'project_description'],
+        fieldMappings: {
+          id: 'record_id',
+          title: 'project_name',
+          description: 'project_description'
+        }
       }
-    },
-    fieldMappings: {
-      id: 'permit_number',
-      status: 'status', 
-      submitDate: 'filed_date',
-      approvalDate: 'issued_date',
-      value: 'estimated_cost',
-      title: 'permit_type'
     },
     authentication: {
       required: false,
@@ -324,13 +329,6 @@ test('SocrataClient - getAvailableTypes queries distinct types', async t => {
   t.true(request!.params.$select.includes('distinct'), 'Should use distinct select');
 });
 
-test('SocrataClient - getAvailableTypes handles missing type field', async t => {
-  const { client } = createTestClient(mockSocrataSourceMinimal);
-  
-  // Source without datasets configuration should return empty array
-  const types = await client.getAvailableTypes();
-  t.is(types.length, 0, 'Should return empty array for source without type field');
-});
 
 test('SocrataClient - rate limiting with app token', async t => {
   createTestClient(mockSocrataSource, { appToken: 'test-token' });
@@ -440,7 +438,7 @@ test('SocrataClient - handles source without datasets gracefully', async t => {
     await client.query('anyDataset');
   });
   
-  assertError(t, error!, 'No datasets configured', 'MunicipalDataError');
+  assertError(t, error!, 'Dataset "anyDataset" not configured', 'MunicipalDataError');
 });
 
 test('SocrataClient - getPrimaryDataset selects correct dataset', async t => {

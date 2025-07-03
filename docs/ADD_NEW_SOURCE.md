@@ -32,8 +32,15 @@ Before adding a new source, you'll need:
    - Use the `api-samples/` directory to see real data structures
    - Verify field names and data types from existing sources
    - Understand how numeric values are stored (often as text in Socrata)
+   - **CRITICAL**: List ALL actual API fields, not just consistent ones
 
-4. **Development Environment**
+4. **Registry Validation Requirements**
+   - Field mappings must point to fields that actually exist in API responses
+   - Field arrays must include ALL fields returned by the API (use UNION of dump + sample data)
+   - Create Zod schemas based on real API response structure
+   - Test against reality, not mocks - our registry validation tests will catch errors
+
+5. **Development Environment**
    - Node.js and TypeScript setup
    - Universal Socrata token configured (if applicable)
 
@@ -69,22 +76,25 @@ municipal.registerSource({
       buildingPermits: {
         endpoint: '/resource/k44w-2dcq.json',
         name: 'Building Permits',
-        fields: ['permit_number', 'application_date', 'issue_date', 'address', 'description']
+        fields: ['permit_number', 'application_date', 'issue_date', 'address', 'description', 'permit_value', 'permit_type', 'contractor_name'],
+        fieldMappings: {
+          id: 'permit_number',
+          submitDate: 'application_date', 
+          approvalDate: 'issue_date',
+          address: 'address',
+          description: 'description',
+          value: 'permit_value',
+          title: 'permit_type',
+          applicant: 'contractor_name'
+        }
       }
-    },
-    fieldMappings: {
-      id: 'permit_number',
-      submitDate: 'application_date', 
-      approvalDate: 'issue_date',
-      address: 'address',
-      description: 'description'
     }
   },
   priority: 'high'
 });
 
 // Now search Seattle data
-const results = await municipal.search({ sources: ['seattle'] });
+const results = await municipal.search({ municipalityId: 'seattle' });
 ```
 
 ### Step 3: Test and Refine
@@ -93,7 +103,7 @@ const results = await municipal.search({ sources: ['seattle'] });
 // Test the source
 try {
   const results = await municipal.search({ 
-    sources: ['seattle'], 
+    municipalityId: 'seattle', 
     limit: 3 
   });
   console.log(`Found ${results.projects.length} permits from Seattle`);
@@ -147,19 +157,19 @@ Edit `src/data/municipal-registry.ts` and add your source:
       buildingPermits: {
         endpoint: "/resource/k44w-2dcq.json",
         name: "Building Permits",
-        fields: ["permit_number", "application_date", "issue_date", "address", "description"]
+        fields: ["permit_number", "application_date", "issue_date", "address", "description", "permit_value", "status", "permit_type", "contractor_name"],
+        fieldMappings: {
+          submitDate: "application_date",
+          approvalDate: "issue_date", 
+          value: "permit_value",
+          address: "address",
+          id: "permit_number",
+          status: "status",
+          description: "description",
+          title: "permit_type",
+          applicant: "contractor_name"
+        }
       }
-    },
-    fieldMappings: {
-      submitDate: "application_date",
-      approvalDate: "issue_date", 
-      value: "permit_value",
-      address: "address",
-      id: "permit_number",
-      status: "status",
-      description: "description",
-      title: "permit_type",
-      applicant: "contractor_name"
     },
     authentication: {
       required: false,
@@ -189,7 +199,34 @@ Edit `src/data/municipal-registry.ts` and add your source:
 
 **Note**: Portal clients are not yet implemented. Use API sources for now.
 
-### Step 3: Test and Build
+### Step 3: Create Validation Schema
+
+Add a Zod schema for your municipality in `src/schemas/api-responses.ts`:
+
+```typescript
+export const SeattleBuildingPermitSchema = z.object({
+  permit_number: z.string().optional(),
+  application_date: z.string().optional(), 
+  issue_date: z.string().optional(),
+  address: z.string().optional(),
+  description: z.string().optional(),
+  permit_value: z.string().optional(), // TEXT field requiring ::number casting
+  status: z.string().optional(),
+  permit_type: z.string().optional(),
+  contractor_name: z.string().optional(),
+  // Include ALL actual API fields based on real response
+});
+
+// Add to schema map
+export const API_SCHEMAS = {
+  // ... existing schemas
+  seattle: {
+    buildingPermits: SeattleBuildingPermitSchema,
+  },
+} as const;
+```
+
+### Step 4: Test and Build
 
 ```bash
 # Build the package
@@ -198,18 +235,21 @@ yarn build
 # Test your new source
 yarn test:unit
 
+# CRITICAL: Run registry validation tests
+yarn test src/registry-validation.spec.ts
+
 # Test with real data (if you have a token)
 SOCRATA_TOKEN=your-token node -e "
 const { createMunicipalIntel } = require('./build/main');
 const m = createMunicipalIntel();
 m.setSocrataToken(process.env.SOCRATA_TOKEN);
-m.search({ sources: ['seattle'], limit: 1 }).then(r => 
+m.search({ municipalityId: 'seattle', limit: 1 }).then(r => 
   console.log('Success:', r.projects.length, 'projects')
 ).catch(e => console.error('Error:', e.message));
 "
 ```
 
-### Step 4: Submit PR
+### Step 5: Submit PR
 
 ```bash
 git checkout -b add-seattle-source
@@ -218,6 +258,43 @@ git commit -m "Add Seattle building permits source"
 git push origin add-seattle-source
 # Create PR on GitHub
 ```
+
+---
+
+## Registry Validation & Testing Approach
+
+**CRITICAL LESSON**: Our previous registry had broken field mappings for months because tests used mocks instead of real data.
+
+### Schema-First Approach
+
+1. **Create schemas from real API responses** - not from assumptions
+2. **Include ALL API fields** - not just the ones you think are important
+3. **Test against real APIs** - not mocks that hide registry errors
+
+### Validation Tests
+
+The package includes reality-based validation tests in `src/registry-validation.spec.ts`:
+
+- **Field Mapping Validation**: Tests that all field mappings point to fields that actually exist
+- **Schema Validation**: Tests that API responses match our Zod schemas 
+- **Completeness Testing**: Tests that registry field arrays include ALL API fields
+- **Value Type Testing**: Tests that numeric fields can actually be cast to numbers
+
+**These tests run against real APIs and WILL catch registry errors.**
+
+### Registry Anti-Patterns to Avoid
+
+❌ **DON'T** only include "consistent" fields in the registry  
+✅ **DO** include ALL fields using UNION of dump + sample data
+
+❌ **DON'T** assume field names without checking API responses  
+✅ **DO** verify every field mapping against actual API data
+
+❌ **DON'T** create tests that use mocks for registry validation  
+✅ **DO** test against real APIs to catch field mapping errors
+
+❌ **DON'T** guess at API response structure  
+✅ **DO** save actual API samples and create schemas from them
 
 ---
 
@@ -248,7 +325,7 @@ fieldMappings: {
 
 ```typescript
 const results = await municipal.search({
-  sources: ['your-city'],
+  municipalityId: 'your-city',
   minValue: 100000
 });
 
@@ -277,7 +354,7 @@ municipal.registerSource({
 });
 
 // Test basic search first
-const results = await municipal.search({ sources: ['test-city'], limit: 1 });
+const results = await municipal.search({ municipalityId: 'test-city', limit: 1 });
 console.log('Raw data:', results.projects[0]?.rawData);
 ```
 
