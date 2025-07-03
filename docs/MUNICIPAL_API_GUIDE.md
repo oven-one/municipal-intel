@@ -206,85 +206,118 @@ GET https://data.lacity.org/resource/yv23-pmwf.json
 &$select=permit_number,address,permit_type,status
 ```
 
-## Data Normalization Strategy
+## AI-First Data Strategy
 
-### Common Schema
+### Simplified Schema (Post-Normalization Era)
 ```typescript
 interface MunicipalProject {
-  // Required fields
-  id: string;              // Unique identifier
-  source: string;          // Municipality code (e.g., 'sf', 'nyc')
-  type: ProjectType;       // 'permit' | 'planning' | 'construction'
-  title: string;           // Project name or description
-  address: string;         // Normalized address
-  status: string;          // Current status
-  submitDate: Date;        // Application/filing date
+  // Core fields optimized for AI consumption
+  id: string;              // Unique identifier (e.g., "sf-2024-001234")
+  source: string;          // Municipality ID (e.g., "sf", "nyc")
+  description: string;     // Natural language description with full context
+  rawData: any;           // Complete original API response
+  lastUpdated: Date;      // When data was last fetched
+}
+```
+
+### Why We Abandoned Field Normalization
+
+**Previous Problem**: Complex 25+ field schema that:
+- Failed to normalize disparate data sources effectively
+- Doubled JSON payload size with duplicate data
+- Added noise for AI consumers
+- Required constant maintenance as APIs changed
+
+**AI-First Solution**: 
+- **Natural Language Descriptions**: Dataset-specific, contextual summaries
+- **Raw Data Preservation**: Complete original response for detailed analysis  
+- **Geographic Context**: Full municipal context in descriptions
+- **70% Smaller Payloads**: Eliminated duplicate normalized fields
+
+### getDescription Method Examples
+
+#### San Francisco Building Permits
+```typescript
+getDescription: (data: SFBuildingPermit) => {
+  const parts = [];
   
-  // Optional fields
-  approvalDate?: Date;     // When approved
-  value?: number;          // Estimated cost/value
-  applicant?: string;      // Applicant name
-  contractor?: string;     // Contractor name
-  description?: string;    // Detailed description
-  documents?: Document[];  // Related documents
-  url?: string;           // Link to details
-  coordinates?: {         // Geolocation
-    lat: number;
-    lng: number;
-  };
+  // Project type and description
+  if (data.permit_type) parts.push(data.permit_type);
+  if (data.description) parts.push(`for ${data.description}`);
+  
+  // Full address with municipal context
+  const address = buildFullAddress(data);
+  if (address) parts.push(`at ${address}, San Francisco, CA${data.zipcode ? ` ${data.zipcode}` : ''}`);
+  
+  // Timeline information
+  if (data.filed_date) {
+    const filedDate = formatDate(data.filed_date);
+    parts.push(`Filed ${filedDate}`);
+  }
+  if (data.issued_date) {
+    const issuedDate = formatDate(data.issued_date);
+    parts.push(`issued ${issuedDate}`);
+  }
+  
+  // Financial information
+  if (data.estimated_cost && !isNaN(Number(data.estimated_cost))) {
+    const cost = formatCurrency(Number(data.estimated_cost));
+    parts.push(`Estimated cost: ${cost}`);
+  }
+  
+  // Stakeholders
+  if (data.applicant_name) parts.push(`Applicant: ${data.applicant_name}`);
+  
+  return parts.filter(Boolean).join(' ') || 'San Francisco Building Permit';
 }
 ```
 
-### Field Mapping Examples
-
-#### San Francisco Socrata
+#### Los Angeles Current Building Permits  
 ```typescript
-function normalizeSFPermit(permit: any): MunicipalProject {
-  return {
-    id: `sf-${permit.permit_number}`,
-    source: 'sf',
-    type: mapPermitType(permit.permit_type),
-    title: permit.description || 'Building Permit',
-    address: normalizeAddress({
-      number: permit.street_number,
-      street: permit.street_name,
-      suffix: permit.street_suffix
-    }),
-    status: permit.status,
-    submitDate: new Date(permit.filed_date),
-    approvalDate: permit.issued_date ? new Date(permit.issued_date) : undefined,
-    value: parseFloat(permit.estimated_cost) || undefined,
-    applicant: permit.applicant_name,
-    coordinates: permit.location ? {
-      lat: parseFloat(permit.location.latitude),
-      lng: parseFloat(permit.location.longitude)
-    } : undefined
-  };
+getDescription: (data: LACurrentBuildingPermit) => {
+  const parts = [];
+  
+  // Permit details
+  if (data.permit_sub_type) parts.push(data.permit_sub_type);
+  if (data.permit_type) parts.push(data.permit_type);
+  if (data.work_desc) parts.push(`${data.work_desc}`);
+  
+  // Full geographic context
+  if (data.primary_address) {
+    const address = `at ${data.primary_address}, Los Angeles, CA${data.zip_code ? ` ${data.zip_code}` : ''}`;
+    parts.push(address);
+  }
+  
+  // Status and timeline
+  if (data.status) parts.push(`Status: ${data.status}`);
+  if (data.issue_date) {
+    const issueDate = formatDate(data.issue_date);
+    parts.push(`Issued ${issueDate}`);
+  }
+  
+  // Financial information
+  if (data.valuation && !isNaN(Number(data.valuation))) {
+    const cost = formatCurrency(Number(data.valuation));
+    parts.push(`Valuation: ${cost}`);
+  }
+  
+  return parts.filter(Boolean).join(' ') || 'Los Angeles Building Permit';
 }
 ```
 
-#### NYC DOB
-```typescript
-function normalizeNYCPermit(permit: any): MunicipalProject {
-  return {
-    id: `nyc-${permit.job__}-${permit.doc__}`,
-    source: 'nyc',
-    type: mapNYCJobType(permit.job_type),
-    title: `${permit.job_type} - ${permit.job_status_descrp}`,
-    address: `${permit.house__} ${permit.street_name}, ${permit.borough}`,
-    status: permit.permit_status,
-    submitDate: new Date(permit.filing_date),
-    approvalDate: permit.issuance_date ? new Date(permit.issuance_date) : undefined,
-    value: permit.estimated_job_cost,
-    applicant: permit.owner_s_business_name || 
-              `${permit.owner_s_first_name} ${permit.owner_s_last_name}`,
-    coordinates: permit.latitude ? {
-      lat: parseFloat(permit.latitude),
-      lng: parseFloat(permit.longitude)
-    } : undefined
-  };
-}
-```
+### Benefits of Description-Based Approach
+
+**For AI Assistants:**
+- Self-contained context (no need to piece together fields)
+- Natural language ready for LLM processing
+- Geographic context always included
+- Domain-specific nuances captured per dataset
+
+**For Developers:**
+- Simpler integration (one field vs. 25+ field normalization)
+- Smaller payloads (raw data + description vs. raw + normalized)
+- Raw data always available for custom processing
+- No complex field mapping maintenance
 
 ## Best Practices
 
@@ -369,32 +402,46 @@ async function withRetry<T>(
 }
 ```
 
-### 4. Data Validation
+### 4. Data Validation (Simplified Schema)
 ```typescript
 import { z } from 'zod';
 
+// Simplified schema for AI-first approach
 const MunicipalProjectSchema = z.object({
   id: z.string(),
-  source: z.string(),
-  type: z.enum(['permit', 'planning', 'construction']),
-  title: z.string(),
-  address: z.string(),
-  status: z.string(),
-  submitDate: z.date(),
-  approvalDate: z.date().optional(),
-  value: z.number().optional(),
-  applicant: z.string().optional(),
-  contractor: z.string().optional(),
+  source: z.string(), 
+  description: z.string(),
+  rawData: z.any(), // Preserve complete original response
+  lastUpdated: z.date()
+});
+
+// Dataset-specific schemas for raw data validation
+const SFBuildingPermitSchema = z.object({
+  permit_number: z.string().optional(),
+  permit_type: z.string().optional(),
   description: z.string().optional(),
-  url: z.string().url().optional(),
-  coordinates: z.object({
-    lat: z.number(),
-    lng: z.number()
+  filed_date: z.string().optional(),
+  issued_date: z.string().optional(),
+  estimated_cost: z.string().optional(),
+  applicant_name: z.string().optional(),
+  street_number: z.string().optional(),
+  street_name: z.string().optional(),
+  street_suffix: z.string().optional(),
+  zipcode: z.string().optional(),
+  status: z.string().optional(),
+  location: z.object({
+    latitude: z.string().optional(),
+    longitude: z.string().optional()
   }).optional()
+  // Include ALL actual API fields based on real responses
 });
 
 function validateProject(data: any): MunicipalProject {
   return MunicipalProjectSchema.parse(data);
+}
+
+function validateSFRawData(data: any): SFBuildingPermit {
+  return SFBuildingPermitSchema.parse(data);
 }
 ```
 

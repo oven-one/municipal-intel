@@ -8,15 +8,7 @@ export const sampleProjects: MunicipalProject[] = [
   {
     id: 'sf-2024-001',
     source: 'sf',
-    type: 'permit',
-    title: 'Residential Addition',
-    address: '123 Main St',
-    status: 'approved',
-    submitDate: new Date('2024-01-15'),
-    approvalDate: new Date('2024-02-01'),
-    value: 50000,
-    applicant: 'John Doe',
-    description: 'Addition to single family home',
+    description: 'Residential Addition: Addition to single family home at 123 Main St, San Francisco, CA (Issued) $50,000 filed 1/15/2024',
     rawData: {
       permit_number: '2024-001',
       permit_type: 'Residential Addition',
@@ -34,14 +26,7 @@ export const sampleProjects: MunicipalProject[] = [
   {
     id: 'sf-2024-002',
     source: 'sf',
-    type: 'permit',
-    title: 'Commercial Renovation',
-    address: '456 Commercial Ave',
-    status: 'under_review',
-    submitDate: new Date('2024-01-20'),
-    value: 250000,
-    applicant: 'ABC Corp',
-    description: 'Office space renovation',
+    description: 'Commercial Renovation: Office space renovation at 456 Commercial Ave, San Francisco, CA (Under Review) $250,000 filed 1/20/2024',
     rawData: {
       permit_number: '2024-002',
       permit_type: 'Commercial Renovation',
@@ -58,14 +43,19 @@ export const sampleProjects: MunicipalProject[] = [
   {
     id: 'nyc-2024-001',
     source: 'nyc',
-    type: 'permit',
-    title: 'New Construction',
-    address: '789 Broadway',
-    status: 'pending',
-    submitDate: new Date('2024-01-25'),
-    value: 1000000,
-    applicant: 'XYZ Development',
-    description: 'New apartment building',
+    description: 'New Construction: New apartment building at 789 Broadway, Manhattan, New York, NY (Pending) $1,000,000 filed 1/25/2024',
+    rawData: {
+      permit_number: '2024-001',
+      job_type: 'New Construction',
+      permit_status: 'Pending',
+      filing_date: '2024-01-25T00:00:00.000',
+      estimated_job_costs: '1000000',
+      house__: '789',
+      street_name: 'Broadway',
+      borough: 'Manhattan',
+      job_description: 'New apartment building',
+      applicant: 'XYZ Development'
+    },
     lastUpdated: new Date('2024-01-30')
   }
 ];

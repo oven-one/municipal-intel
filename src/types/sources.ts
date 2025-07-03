@@ -3,6 +3,13 @@
  */
 
 import { z } from 'zod';
+import type { 
+  SFBuildingPermit, 
+  LACurrentBuildingPermit, 
+  LABuildingPermit, 
+  NYCDOBPermit, 
+  NYCDOBNowBuild 
+} from '../schemas/api-responses';
 
 /**
  * Type of data access method
@@ -25,13 +32,25 @@ export type PortalSystem = 'accela' | 'custom' | 'eBUILD' | 'ePermits' | 'MyJax'
 export type Priority = 'high' | 'medium' | 'low';
 
 /**
- * Socrata dataset configuration
+ * Union type for all supported dataset record types
  */
-export interface SocrataDataset {
+export type SocrataRecord = 
+  | SFBuildingPermit 
+  | LACurrentBuildingPermit 
+  | LABuildingPermit 
+  | NYCDOBPermit 
+  | NYCDOBNowBuild;
+
+/**
+ * Socrata dataset configuration with typed record support
+ */
+export interface SocrataDataset<T extends SocrataRecord = SocrataRecord> {
   endpoint: string;      // e.g., "/resource/i98e-djp9.json"
   name: string;          // Human-readable name
   fields: string[];      // Available fields
   fieldMappings?: Record<string, string>; // Mapping from logical fields to dataset fields
+  getFullAddress: (data: T) => string; // Build complete address from strongly-typed data
+  getDescription: (data: T) => string; // Build rich natural language description with full context
 }
 
 /**
@@ -60,7 +79,8 @@ export interface RateLimit {
 export interface ApiSource {
   type: ApiType;
   baseUrl: string;
-  datasets?: Record<string, SocrataDataset>;
+  datasets?: Record<string, SocrataDataset<any>>;
+  defaultDataset?: string;  // Which dataset to use by default
   endpoints?: Record<string, string>;  // For custom APIs
   authentication?: ApiAuth;
   rateLimit?: RateLimit;
@@ -165,7 +185,9 @@ export const SocrataDatasetSchema = z.object({
   endpoint: z.string(),
   name: z.string(),
   fields: z.array(z.string()),
-  fieldMappings: z.record(z.string()).optional()
+  fieldMappings: z.record(z.string()).optional(),
+  getFullAddress: z.function().returns(z.string()),
+  getDescription: z.function().returns(z.string())
 });
 
 export const ApiSourceSchema = z.object({

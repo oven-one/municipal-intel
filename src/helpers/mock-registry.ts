@@ -23,7 +23,9 @@ export const mockRegistryData: SourceRegistry = {
               buildingPermits: {
                 endpoint: '/resource/i98e-djp9.json',
                 name: 'Building Permits',
-                fields: ['permit_number', 'permit_type', 'status', 'filed_date']
+                fields: ['permit_number', 'permit_type', 'status', 'filed_date'],
+                getFullAddress: (data) => data.address || 'Unknown Address',
+                getDescription: (data) => `${data.permit_type || 'Permit'} at ${data.address || 'Unknown Address'}, San Francisco, CA`
               }
             },
             authentication: {
@@ -63,7 +65,9 @@ export const mockRegistryData: SourceRegistry = {
               buildingPermits: {
                 endpoint: '/resource/ipu4-2q9a.json',
                 name: 'DOB Job Application Filings',
-                fields: ['job_', 'job_type', 'job_status', 'pre_filing_date']
+                fields: ['job_', 'job_type', 'job_status', 'pre_filing_date'],
+                getFullAddress: (data) => data.address || 'Unknown Address',
+                getDescription: (data) => `${data.job_type || 'DOB Permit'} at ${data.address || 'Unknown Address'}, New York, NY`
               }
             }
           },
@@ -113,7 +117,9 @@ export const mockSources: MunicipalSource[] = [
         buildingPermits: {
           endpoint: '/resource/i98e-djp9.json',
           name: 'Building Permits',
-          fields: ['permit_number', 'permit_type', 'status', 'filed_date']
+          fields: ['permit_number', 'permit_type', 'status', 'filed_date'],
+          getFullAddress: (data) => data.address || 'Unknown Address',
+          getDescription: (data) => `${data.permit_type || 'Permit'} at ${data.address || 'Unknown Address'}, San Francisco, CA`
         }
       }
     },

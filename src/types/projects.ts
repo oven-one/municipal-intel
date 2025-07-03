@@ -73,47 +73,17 @@ export interface Coordinates {
 }
 
 /**
- * Standardized municipal project interface
+ * Simplified municipal project interface optimized for AI consumption
  */
 export interface MunicipalProject {
   // Required fields
   id: string;              // Unique identifier (prefixed with source)
-  source: string;          // Municipality code (e.g., 'sf', 'nyc')
-  type: ProjectType;       // Type of project
-  title: string;           // Project name or description
-  address: string;         // Normalized address
-  status: ProjectStatus;   // Current status
-  submitDate: Date;        // Application/filing date
-
-  // Optional fields
-  approvalDate?: Date;     // When approved/issued
-  expirationDate?: Date;   // When permit expires
-  completionDate?: Date;   // When project completed
+  source: string;          // Municipality code (e.g., 'sf', 'nyc', 'la')
+  description: string;     // Rich natural language description with full context
   
-  value?: number;          // Estimated cost/value
-  squareFootage?: number;  // Size of project
-  units?: number;          // Number of units (for residential)
-  
-  applicant?: string;      // Applicant name
-  applicantCompany?: string;
-  contractor?: string;     // Contractor name
-  contractorCompany?: string;
-  architect?: string;      // Architect/engineer
-  
-  description?: string;    // Detailed description
-  scope?: string;          // Scope of work
-  
-  documents?: ProjectDocument[];  // Related documents
-  url?: string;           // Link to details page
-  
-  coordinates?: Coordinates;      // Geolocation
-  parcel?: string;        // Parcel/lot number
-  block?: string;         // Block number
-  lot?: string;           // Lot number
-  
-  // Source-specific fields
-  rawData?: any;          // Original data from source
-  lastUpdated?: Date;     // When we last fetched this
+  // Source data
+  rawData: any;           // Complete original data from source API
+  lastUpdated: Date;      // When we last fetched this record
 }
 
 /**
@@ -122,6 +92,7 @@ export interface MunicipalProject {
 export interface MunicipalSearchParams {
   // Location filters
   municipalityId?: KnownMunicipalityId; // Municipality ID ('sf', 'nyc', 'la')
+  datasetId?: string;      // Specific dataset to search (optional, uses default if not specified)
   addresses?: string[];    // Specific addresses
   zipCodes?: string[];     // ZIP codes
   
@@ -213,38 +184,9 @@ export const MunicipalProjectSchema = z.object({
   // Required
   id: z.string(),
   source: z.string(),
-  type: z.enum(['permit', 'planning', 'construction', 'renovation', 'demolition']),
-  title: z.string(),
-  address: z.string(),
-  status: z.enum(['pending', 'under_review', 'approved', 'issued', 'active', 'completed', 'expired', 'cancelled', 'on_hold']),
-  submitDate: z.date(),
+  description: z.string(),
   
-  // Optional
-  approvalDate: z.date().optional(),
-  expirationDate: z.date().optional(),
-  completionDate: z.date().optional(),
-  
-  value: z.number().optional(),
-  squareFootage: z.number().optional(),
-  units: z.number().optional(),
-  
-  applicant: z.string().optional(),
-  applicantCompany: z.string().optional(),
-  contractor: z.string().optional(),
-  contractorCompany: z.string().optional(),
-  architect: z.string().optional(),
-  
-  description: z.string().optional(),
-  scope: z.string().optional(),
-  
-  documents: z.array(ProjectDocumentSchema).optional(),
-  url: z.string().url().optional(),
-  
-  coordinates: CoordinatesSchema.optional(),
-  parcel: z.string().optional(),
-  block: z.string().optional(),
-  lot: z.string().optional(),
-  
-  rawData: z.any().optional(),
-  lastUpdated: z.date().optional()
+  // Source data
+  rawData: z.any(),
+  lastUpdated: z.date()
 });
