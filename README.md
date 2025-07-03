@@ -13,6 +13,7 @@ Access municipal planning applications, building permits, and construction activ
 - **TypeScript Native**: Built-in sources defined in TypeScript (no JSON dependencies)
 - **Runtime Extensible**: Add new cities dynamically without package updates
 - **Universal Socrata Token**: Single token works across all Socrata portals
+- **Transparent Adjustments**: Best-effort queries with clear reporting of any modifications
 - **Type Safety**: Full TypeScript support with Zod schema validation
 - **Rate Limiting**: Built-in rate limiting and retry logic
 
@@ -185,6 +186,79 @@ const miamiResults = await municipal.search({ sources: ['miami'] });
 municipal.unregisterSource('miami');
 ```
 
+## Query Adjustments & Transparency
+
+The library implements a best-effort approach with full transparency when handling different data sources. When a requested filter cannot be applied to a particular source, the library will continue the search and report what adjustments were made.
+
+### Adjustments Array
+
+All search responses include an `adjustments` array that reports any modifications made to your query:
+
+```typescript
+interface MunicipalSearchResponse {
+  projects: MunicipalProject[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  adjustments: string[];  // Query modifications made during search
+}
+```
+
+### Common Adjustments
+
+**Value Filter Skipping**: Some sources don't have cost/value fields
+```typescript
+const results = await municipal.search({
+  sources: ['sf', 'nyc'],
+  minValue: 100000
+});
+
+// Results:
+// {
+//   projects: [...],
+//   total: 1234,
+//   adjustments: [
+//     "NYC: Skipped minValue filter - no value field available in dataset"
+//   ]
+// }
+```
+
+**Field Type Conversions**: Socrata sources store numbers as text, requiring automatic casting
+```typescript
+// The library automatically converts text to numbers for comparisons
+// SF: estimated_cost field contains "500000" (string) 
+// Query: WHERE estimated_cost::number >= 100000
+// No adjustment needed - handled transparently
+```
+
+### Adjustment Principles
+
+- **Silent Success**: No adjustments reported when everything works normally
+- **Transparent Failures**: Only report when something unexpected happens
+- **Continue on Errors**: Skip problematic filters rather than fail entire search
+- **AI-Friendly**: Clean responses for automated processing
+
+### Best Practices
+
+**For AI Assistants**:
+```typescript
+const results = await municipal.search(params);
+
+if (results.adjustments.length > 0) {
+  // Inform user about limitations
+  console.log('Note: ' + results.adjustments.join('; '));
+}
+```
+
+**For Applications**:
+```typescript
+// Always check adjustments for user feedback
+if (results.adjustments.length > 0) {
+  showWarning('Some filters were not available for all sources');
+}
+```
+
 ## Data Types
 
 ### MunicipalProject
@@ -274,6 +348,66 @@ try {
     console.log('API error:', error.message, 'Source:', error.source);
   }
 }
+```
+
+## Troubleshooting
+
+### Value Filtering Issues
+
+**Problem**: Getting 400 errors when using `minValue` parameter
+```typescript
+// This might fail with "Invalid SoQL query" error
+const results = await municipal.search({
+  sources: ['sf'],
+  minValue: 100000  // 400 error
+});
+```
+
+**Solution**: The library automatically handles this by converting text fields to numbers. If you see this error, ensure you're using the latest version.
+
+**Explanation**: Socrata APIs store numeric values as text strings (e.g., `"500000"` instead of `500000`). The library automatically applies `::number` casting for all numeric comparisons.
+
+### Missing Value Fields
+
+**Problem**: Some sources don't return value information
+```typescript
+const results = await municipal.search({
+  sources: ['nyc'],
+  minValue: 100000
+});
+// NYC projects show value: null
+```
+
+**Solution**: Check the `adjustments` array for information about skipped filters:
+```typescript
+if (results.adjustments.length > 0) {
+  console.log('Filters adjusted:', results.adjustments);
+  // Output: ["NYC: Skipped minValue filter - no value field available in dataset"]
+}
+```
+
+### Rate Limiting
+
+**Problem**: Getting rate limited frequently
+**Solution**: Use a Socrata app token:
+```typescript
+municipal.setSocrataToken(process.env.SOCRATA_TOKEN);
+// Increases limit from ~100/hour to 1000/hour per portal
+```
+
+### Field Mappings
+
+**Problem**: Custom sources not returning expected data
+**Solution**: Verify field mappings match actual API response:
+
+1. Check the API samples in `/api-samples/` directory
+2. Ensure your `fieldMappings` use correct field names
+3. Use the library's field discovery tools
+
+```typescript
+// Check available fields for your source
+const source = municipal.getSource('your-city');
+console.log('Available fields:', source.api?.datasets?.buildingPermits?.fields);
 ```
 
 ## Development
