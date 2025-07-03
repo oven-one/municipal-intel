@@ -1,0 +1,37 @@
+{
+  "timestamp": "2025-07-03T06:59:09.135Z",
+  "note": "Field comparison for NYC datasets to identify inconsistencies",
+  "datasets": {
+    "dobPermitIssuance": {
+      "endpoint": "/resource/ipu4-2q9a.json",
+      "expectedFields": {
+        "id": "permit_si_no",
+        "submitDate": "filing_date",
+        "approvalDate": "issuance_date",
+        "value": "NONE - no value field",
+        "status": "permit_status"
+      }
+    },
+    "dobNowBuildApproved": {
+      "endpoint": "/resource/rbx6-tga4.json",
+      "expectedFields": {
+        "id": "job_filing_number",
+        "submitDate": "approved_date",
+        "approvalDate": "issued_date",
+        "value": "estimated_job_costs",
+        "status": "work_permit"
+      }
+    },
+    "activeMajorProjects": {
+      "endpoint": "/resource/n5mv-nfpy.json",
+      "expectedFields": {
+        "id": "project_id",
+        "submitDate": "project_start_date",
+        "approvalDate": "expected_completion_date",
+        "value": "total_construction_floor_area_sq_ft",
+        "status": "NONE - no status field"
+      },
+      "note": "Requires authentication - may not be accessible"
+    }
+  }
+}
