@@ -28,7 +28,12 @@ Before adding a new source, you'll need:
    - Rate limits and authentication details
    - Legal compliance (terms of service, attribution)
 
-3. **Development Environment**
+3. **Field Discovery**
+   - Use the `api-samples/` directory to see real data structures
+   - Verify field names and data types from existing sources
+   - Understand how numeric values are stored (often as text in Socrata)
+
+4. **Development Environment**
    - Node.js and TypeScript setup
    - Universal Socrata token configured (if applicable)
 
@@ -215,6 +220,83 @@ git push origin add-seattle-source
 ```
 
 ---
+
+## Common Issues & Solutions
+
+### Value Filtering Problems
+
+**Issue**: 400 errors when using `minValue` with custom Socrata sources
+```
+Error: Invalid SoQL query
+```
+
+**Solution**: Socrata stores numeric values as text. The library automatically handles this with `::number` casting. Ensure your field mappings are correct:
+
+```typescript
+fieldMappings: {
+  value: "estimated_cost",  // Make sure this field name exists in the API
+  // ...
+}
+```
+
+**Check field names** using the API samples in `/api-samples/` or test queries directly.
+
+### Missing Fields
+
+**Issue**: Some fields return `undefined` or `null`
+**Solution**: Use the adjustments framework to understand what's happening:
+
+```typescript
+const results = await municipal.search({
+  sources: ['your-city'],
+  minValue: 100000
+});
+
+if (results.adjustments.length > 0) {
+  console.log('Query adjustments:', results.adjustments);
+  // May show: "YOUR-CITY: Skipped minValue filter - no value field available in dataset"
+}
+```
+
+### Field Discovery
+
+**Use API samples** to understand data structure:
+1. Check `/api-samples/sf-sample.json` for field naming patterns
+2. Look at `/api-samples/la-fields.json` for available field lists
+3. Compare your API response to existing patterns
+
+**Test your field mappings**:
+```typescript
+// Register with minimal fields first
+municipal.registerSource({
+  id: 'test-city',
+  fieldMappings: {
+    id: 'permit_number',     // Start with required fields only
+    status: 'permit_status'
+  }
+});
+
+// Test basic search first
+const results = await municipal.search({ sources: ['test-city'], limit: 1 });
+console.log('Raw data:', results.projects[0]?.rawData);
+```
+
+### Data Type Issues
+
+**Socrata quirks**:
+- Numbers stored as strings: `"50000"` not `50000`
+- Dates in various formats: `"2024-01-15T00:00:00.000"` or `"01/15/2024"`
+- Boolean values as strings: `"Y"/"N"` or `"true"/"false"`
+
+**The library handles these automatically** but your field mappings must point to correct field names.
+
+### Universal Token Issues
+
+**Problem**: Rate limiting or authentication errors
+**Solution**: 
+1. Get a universal Socrata token from any Socrata portal
+2. Use the same token for all Socrata sources
+3. Configure with `municipal.setSocrataToken(token)`
 
 ## Summary
 
