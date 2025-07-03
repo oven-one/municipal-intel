@@ -9,7 +9,7 @@ import {
   RateLimitError,
   ServiceUnavailableError
 } from './clients/base-client';
-import { assertError } from './helpers/test-utils';
+// Removed test-utils import - inlined simple helpers
 
 test('MunicipalDataError - basic construction', t => {
   const error = new MunicipalDataError('Test error', 'test-source');
@@ -318,11 +318,17 @@ test('Error handling in promise chains', async t => {
   
   // Test that errors propagate correctly through promise chains
   const authError = await t.throwsAsync(createFailingPromise('auth'));
-  assertError(t, authError!, 'Authentication failed', 'AuthenticationError');
+  t.truthy(authError, 'Should throw error');
+  t.true(authError!.message.includes('Authentication failed'), 'Should have correct error message');
+  t.is(authError!.constructor.name, 'AuthenticationError', 'Should be correct error type');
   
   const rateError = await t.throwsAsync(createFailingPromise('rate'));
-  assertError(t, rateError!, 'Rate limit exceeded', 'RateLimitError');
+  t.truthy(rateError, 'Should throw error');
+  t.true(rateError!.message.includes('Rate limit exceeded'), 'Should have correct error message');
+  t.is(rateError!.constructor.name, 'RateLimitError', 'Should be correct error type');
   
   const serviceError = await t.throwsAsync(createFailingPromise('service'));
-  assertError(t, serviceError!, 'Service is temporarily unavailable', 'ServiceUnavailableError');
+  t.truthy(serviceError, 'Should throw error');
+  t.true(serviceError!.message.includes('Service is temporarily unavailable'), 'Should have correct error message');
+  t.is(serviceError!.constructor.name, 'ServiceUnavailableError', 'Should be correct error type');
 });

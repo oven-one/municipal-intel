@@ -67,7 +67,55 @@ export const SFBuildingPermitSchema = z.object({
 });
 
 /**
- * Los Angeles Building Permits API Response Schema
+ * Los Angeles Building Permits Current (2020-Present) API Response Schema
+ * Based on registry fields from pi9x-tg5x dataset
+ */
+export const LACurrentBuildingPermitSchema = z.object({
+  adu_changed: z.string().optional(),
+  apc: z.string().optional(),
+  apn: z.string().optional(),
+  business_unit: z.string().optional(),
+  cd: z.string().optional(),
+  cnc: z.string().optional(),
+  cofo_date: z.string().optional(),
+  construction: z.string().optional(),
+  cpa: z.string().optional(),
+  ct: z.string().optional(),
+  du_changed: z.string().optional(),
+  ev: z.string().optional(),
+  geolocation: z.object({
+    type: z.literal("Point"),
+    coordinates: z.tuple([z.number(), z.number()])
+  }).optional(),
+  height: z.string().optional(),
+  hl: z.string().optional(),
+  issue_date: z.string().optional(),
+  junior_adu: z.string().optional(),
+  lat: z.string().optional(),
+  lon: z.string().optional(),
+  permit_group: z.string().optional(),
+  permit_nbr: z.string().optional(),
+  permit_sub_type: z.string().optional(),
+  permit_type: z.string().optional(),
+  pin_nbr: z.string().optional(),
+  primary_address: z.string().optional(),
+  refresh_time: z.string().optional(),
+  solar: z.string().optional(),
+  square_footage: z.string().optional(),
+  status_date: z.string().optional(),
+  status_desc: z.string().optional(),
+  submitted_date: z.string().optional(),
+  type_lat_lon: z.string().optional(),
+  use_code: z.string().optional(),
+  use_desc: z.string().optional(),
+  valuation: z.string().optional(),
+  work_desc: z.string().optional(),
+  zip_code: z.string().optional(),
+  zone: z.string().optional(),
+});
+
+/**
+ * Los Angeles Building Permits Legacy API Response Schema
  * Based on registry fields (41 total from field dump)
  */
 export const LABuildingPermitSchema = z.object({
@@ -208,6 +256,7 @@ export const NYCDOBNowBuildSchema = z.object({
  * Type exports for use in tests and validation
  */
 export type SFBuildingPermit = z.infer<typeof SFBuildingPermitSchema>;
+export type LACurrentBuildingPermit = z.infer<typeof LACurrentBuildingPermitSchema>;
 export type LABuildingPermit = z.infer<typeof LABuildingPermitSchema>;
 export type NYCDOBPermit = z.infer<typeof NYCDOBPermitSchema>;
 export type NYCDOBNowBuild = z.infer<typeof NYCDOBNowBuildSchema>;
@@ -220,6 +269,7 @@ export const API_SCHEMAS = {
     buildingPermits: SFBuildingPermitSchema,
   },
   la: {
+    buildingPermitsCurrent: LACurrentBuildingPermitSchema,
     buildingPermits: LABuildingPermitSchema,
   },
   nyc: {

@@ -61,11 +61,10 @@ test('MunicipalProjectSchema - validates complete project', t => {
   
   if (result.success) {
     t.is(result.data.id, 'sf-2024-001', 'Should preserve ID');
-    t.is(result.data.type, 'permit', 'Should preserve type');
-    t.is(result.data.value, 50000, 'Should preserve numeric value');
-    t.true(result.data.submitDate instanceof Date, 'Should preserve date objects');
-    t.is(result.data.coordinates?.lat, 37.7749, 'Should preserve coordinates');
-    t.is(result.data.documents?.length, 1, 'Should preserve documents array');
+    t.is(result.data.source, 'sf', 'Should preserve source');
+    t.truthy(result.data.description, 'Should have description');
+    t.is(typeof result.data.rawData, 'object', 'Should preserve rawData object');
+    t.true(result.data.lastUpdated instanceof Date, 'Should preserve date objects');
   }
 });
 
@@ -73,11 +72,9 @@ test('MunicipalProjectSchema - validates minimal required project', t => {
   const minimalProject = {
     id: 'test-001',
     source: 'test',
-    type: 'permit',
-    title: 'Test Project',
-    address: '123 Test St',
-    status: 'pending',
-    submitDate: new Date('2024-01-01')
+    description: 'Test Project at 123 Test St, Test City, CA (Pending)',
+    rawData: { permit_number: 'test-001', status: 'pending' },
+    lastUpdated: new Date('2024-01-01')
   };
 
   const result = MunicipalProjectSchema.safeParse(minimalProject);
@@ -87,11 +84,9 @@ test('MunicipalProjectSchema - validates minimal required project', t => {
 test('MunicipalProjectSchema - rejects missing required fields', t => {
   const missingIdProject = {
     source: 'test',
-    type: 'permit',
-    title: 'Test',
-    address: '123 Test St',
-    status: 'pending',
-    submitDate: new Date()
+    description: 'Test project',
+    rawData: { permit_number: 'test' },
+    lastUpdated: new Date()
   };
 
   const result = MunicipalProjectSchema.safeParse(missingIdProject);
@@ -191,8 +186,8 @@ test('MunicipalProjectSchema - validates numeric fields', t => {
   t.true(result.success, 'Should validate numeric fields');
   
   if (result.success) {
-    t.is(result.data.value, 100000.50, 'Should preserve decimal values');
-    t.is(result.data.units, 2, 'Should preserve integer values');
+    t.is(result.data.rawData.value, 100000.50, 'Should preserve decimal values in rawData');
+    t.is(result.data.rawData.units, 2, 'Should preserve integer values in rawData');
   }
 });
 
@@ -232,8 +227,8 @@ test('MunicipalProjectSchema - validates date fields', t => {
   t.true(result.success, 'Should validate all date fields');
   
   if (result.success) {
-    t.true(result.data.submitDate instanceof Date, 'Should preserve Date objects');
-    t.true(result.data.approvalDate instanceof Date, 'Should preserve optional Date objects');
+    t.true(result.data.rawData.submitDate instanceof Date, 'Should preserve Date objects in rawData');
+    t.true(result.data.rawData.approvalDate instanceof Date, 'Should preserve optional Date objects in rawData');
     t.is(result.data.lastUpdated?.getTime(), now.getTime(), 'Should preserve exact date values');
   }
 });
@@ -337,8 +332,8 @@ test('MunicipalProjectSchema - validates documents array', t => {
   t.true(result.success, 'Should validate project with documents array');
   
   if (result.success) {
-    t.is(result.data.documents?.length, 2, 'Should preserve documents array');
-    t.is(result.data.documents?.[0].name, 'Plan 1', 'Should preserve document properties');
+    t.is(result.data.rawData.documents?.length, 2, 'Should preserve documents array in rawData');
+    t.is(result.data.rawData.documents?.[0].name, 'Plan 1', 'Should preserve document properties in rawData');
   }
 });
 

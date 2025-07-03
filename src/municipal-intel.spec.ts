@@ -9,7 +9,7 @@ import { MunicipalSource } from './types/sources';
 import { mockRegistryData } from './helpers/mock-registry';
 import { sampleSearchParams } from './helpers/fixtures';
 import { MockHttpClient, mockSocrataResponses, createMockAxios } from './helpers/mock-http';
-import { assertValidProject, assertError } from './helpers/test-utils';
+// Removed test-utils import - inlined simple helpers
 
 // Mock the registry to use test data
 class TestMunicipalIntel extends MunicipalIntel {
@@ -191,7 +191,13 @@ test('MunicipalIntel - search with default sources', async t => {
   t.true(typeof result.page === 'number', 'Should have page number');
   
   if (result.projects.length > 0) {
-    assertValidProject(t, result.projects[0]);
+    const project = result.projects[0];
+    t.truthy(project.id, 'Project should have an ID');
+    t.truthy(project.source, 'Project should have a source');
+    t.truthy(project.description, 'Project should have a description');
+    t.is(typeof project.rawData, 'object', 'Project should have rawData object');
+    t.true(project.lastUpdated instanceof Date, 'Last updated should be a Date object');
+    t.true(project.id.startsWith(project.source + '-'), 'Project ID should start with source prefix');
   }
 });
 
@@ -218,7 +224,8 @@ test('MunicipalIntel - search with no available sources throws error', async t =
     });
   });
   
-  assertError(t, error!, 'Municipality not found');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('Municipality not found'), 'Should have correct error message');
 });
 
 test('MunicipalIntel - search without municipalityId uses first available source', async t => {
@@ -243,7 +250,12 @@ test('MunicipalIntel - getProject finds project by ID', async t => {
   const project = await municipal.getProject('sf', 'sf-2024-001');
   
   t.truthy(project, 'Should find project');
-  assertValidProject(t, project!);
+  t.truthy(project!.id, 'Project should have an ID');
+  t.truthy(project!.source, 'Project should have a source');
+  t.truthy(project!.description, 'Project should have a description');
+  t.is(typeof project!.rawData, 'object', 'Project should have rawData object');
+  t.true(project!.lastUpdated instanceof Date, 'Last updated should be a Date object');
+  t.true(project!.id.startsWith(project!.source + '-'), 'Project ID should start with source prefix');
   t.is(project!.source, 'sf', 'Should have correct source');
 });
 
@@ -264,7 +276,8 @@ test('MunicipalIntel - getProject with invalid source throws error', async t => 
     await municipal.getProject('invalid-source', 'project-id');
   });
   
-  assertError(t, error!, 'Source not found: invalid-source');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('Source not found: invalid-source'), 'Should have correct error message');
 });
 
 test('MunicipalIntel - healthCheck returns health status', async t => {
@@ -290,7 +303,8 @@ test('MunicipalIntel - healthCheck with invalid source throws error', async t =>
     await municipal.healthCheck('invalid-source');
   });
   
-  assertError(t, error!, 'Source not found: invalid-source');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('Source not found: invalid-source'), 'Should have correct error message');
 });
 
 test('MunicipalIntel - healthCheck updates registry status', async t => {
@@ -396,7 +410,8 @@ test('MunicipalIntel - integration with real source types', async t => {
       await municipal.search({ municipalityId: portalSources[0].id as any });
     });
     
-    assertError(t, error!, 'Portal clients not yet implemented');
+    t.truthy(error, 'Should throw error');
+    t.true(error!.message.includes('Portal clients not yet implemented'), 'Should have correct error message');
   }
 });
 

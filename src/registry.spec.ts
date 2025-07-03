@@ -5,7 +5,7 @@
 import test from 'ava';
 import { SourceRegistryManager } from './registry';
 import { mockRegistryData } from './helpers/mock-registry';
-import { assertValidSource } from './helpers/test-utils';
+// Removed test-utils import - inlined simple validation
 
 // Create a test registry with mock data
 class TestRegistryManager extends SourceRegistryManager {
@@ -25,7 +25,12 @@ test('SourceRegistryManager - getAllSources returns all sources with state prope
   
   // Each source should have state property injected
   sources.forEach(source => {
-    assertValidSource(t, source);
+    // Inline source validation
+    t.truthy(source.id, 'Source should have an ID');
+    t.truthy(source.name, 'Source should have a name');
+    t.truthy(source.type, 'Source should have a type');
+    t.truthy(source.priority, 'Source should have a priority');
+    
     t.truthy(source.state, 'Source should have state property');
     t.is(source.state.length, 2, 'State should be 2 characters');
     t.is(source.state, source.state.toUpperCase(), 'State should be uppercase');

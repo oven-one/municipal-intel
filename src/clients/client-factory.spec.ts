@@ -7,7 +7,7 @@ import { ClientFactory } from './index';
 import { SocrataClient } from './socrata';
 import { MunicipalSource } from '../types/sources';
 import { mockSources } from '../helpers/mock-registry';
-import { assertError } from '../helpers/test-utils';
+// Removed test-utils import - inlined simple helpers
 
 test('ClientFactory - constructor with default config', t => {
   const factory = new ClientFactory();
@@ -49,7 +49,8 @@ test('ClientFactory - createClient for custom API source', t => {
     factory.createClient(laSource!);
   });
   
-  assertError(t, error!, 'Custom API clients not yet implemented');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('Custom API clients not yet implemented'), 'Should have correct error message');
 });
 
 test('ClientFactory - createClient for ArcGIS API source', t => {
@@ -71,7 +72,8 @@ test('ClientFactory - createClient for ArcGIS API source', t => {
     factory.createClient(arcgisSource);
   });
   
-  assertError(t, error!, 'ArcGIS clients not yet implemented');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('ArcGIS clients not yet implemented'), 'Should have correct error message');
 });
 
 test('ClientFactory - createClient for portal source', t => {
@@ -84,7 +86,8 @@ test('ClientFactory - createClient for portal source', t => {
     factory.createClient(miamiSource!);
   });
   
-  assertError(t, error!, 'Portal clients not yet implemented');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('Portal clients not yet implemented'), 'Should have correct error message');
 });
 
 test('ClientFactory - createClient for scraping source', t => {
@@ -105,7 +108,8 @@ test('ClientFactory - createClient for scraping source', t => {
     factory.createClient(scrapingSource);
   });
   
-  assertError(t, error!, 'Scraping clients not yet implemented');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('Scraping clients not yet implemented'), 'Should have correct error message');
 });
 
 test('ClientFactory - createClient with unknown source type', t => {
@@ -123,7 +127,8 @@ test('ClientFactory - createClient with unknown source type', t => {
     factory.createClient(unknownSource);
   });
   
-  assertError(t, error!, 'Unknown source type');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('Unknown source type'), 'Should have correct error message');
 });
 
 test('ClientFactory - createClient with missing API config', t => {
@@ -141,7 +146,8 @@ test('ClientFactory - createClient with missing API config', t => {
     factory.createClient(sourceWithoutApi);
   });
   
-  assertError(t, error!, 'API configuration missing');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('API configuration missing'), 'Should have correct error message');
 });
 
 test('ClientFactory - createClient with unknown API type', t => {
@@ -163,7 +169,8 @@ test('ClientFactory - createClient with unknown API type', t => {
     factory.createClient(sourceWithUnknownApi);
   });
   
-  assertError(t, error!, 'Unknown API type');
+  t.truthy(error, 'Should throw error');
+  t.true(error!.message.includes('Unknown API type'), 'Should have correct error message');
 });
 
 test('ClientFactory - updateConfig updates factory configuration', t => {

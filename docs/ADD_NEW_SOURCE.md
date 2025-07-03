@@ -406,13 +406,24 @@ municipal.registerSource({
       status: "current_status", 
       submitDate: "submitted_at",
       address: "property_address"
+    },
+    getFullAddress: (data) => {
+      return data.property_address || 'Unknown Address';
+    },
+    getDescription: (data) => {
+      const parts = [];
+      if (data.permit_type) parts.push(data.permit_type);
+      if (data.work_description) parts.push(`for ${data.work_description}`);
+      if (data.property_address) parts.push(`at ${data.property_address}, Boston, MA`);
+      if (data.current_status) parts.push(`Status: ${data.current_status}`);
+      return parts.filter(Boolean).join(' ') || 'Boston Building Permit';
     }
   },
   priority: "high"
 });
 ```
 
-**Note**: Custom API clients require additional implementation. Socrata APIs work out of the box.
+**Note**: Custom API clients require additional implementation. Socrata APIs work out of the box with the getFullAddress and getDescription methods.
 
 ## Need Help?
 

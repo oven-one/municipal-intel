@@ -110,7 +110,21 @@ export class SocrataClient extends BaseMunicipalClient {
   async search(params: MunicipalSearchParams): Promise<MunicipalSearchResponse> {
     const adjustments: string[] = [];
     const soqlQuery = this.buildSoQLQuery(params, adjustments);
-    const dataset = this.getPrimaryDataset();
+    
+    // Use specified dataset or fall back to default
+    let dataset: string;
+    if (params.datasetId) {
+      const apiSource = this.source.api as ApiSource;
+      if (!apiSource.datasets?.[params.datasetId]) {
+        throw new MunicipalDataError(
+          `Dataset '${params.datasetId}' not found for ${this.source.id}. Available: ${Object.keys(apiSource.datasets || {}).join(', ')}`,
+          this.source.id
+        );
+      }
+      dataset = params.datasetId;
+    } else {
+      dataset = this.getPrimaryDataset();
+    }
 
     const data = await this.query(dataset, soqlQuery);
     const projects = data.map(item => this.normalizeProject(item));
@@ -321,15 +335,21 @@ export class SocrataClient extends BaseMunicipalClient {
       throw new MunicipalDataError(`No datasets configured for ${this.source.id}`, this.source.id);
     }
 
-    // Look for building permits first, then planning applications
-    if (datasets.buildingPermits) return 'buildingPermits';
-    if (datasets.planningApplications) return 'planningApplications';
+    if (!apiSource.defaultDataset) {
+      throw new MunicipalDataError(
+        `No defaultDataset specified for ${this.source.id}. Please add defaultDataset to the API configuration.`,
+        this.source.id
+      );
+    }
 
-    // Use the first available dataset
-    const firstDataset = Object.keys(datasets)[0];
-    if (firstDataset) return firstDataset;
+    if (!datasets[apiSource.defaultDataset]) {
+      throw new MunicipalDataError(
+        `Default dataset '${apiSource.defaultDataset}' not found in datasets for ${this.source.id}. Available: ${Object.keys(datasets).join(', ')}`,
+        this.source.id
+      );
+    }
 
-    throw new MunicipalDataError(`No suitable dataset found for ${this.source.id}`, this.source.id);
+    return apiSource.defaultDataset;
   }
 
   /**
@@ -373,30 +393,32 @@ export class SocrataClient extends BaseMunicipalClient {
   private getAddressField(): string | null { return this.getFieldMapping('address'); }
 
   /**
-   * Normalize raw data to MunicipalProject
-   * This would be implemented per source
+   * Normalize raw data to MunicipalProject using dataset-specific description
    */
   private normalizeProject(data: any): MunicipalProject {
-    // Get field mappings safely
+    const dataset = this.getPrimaryDataset();
+    const apiSource = this.source.api as ApiSource;
+    const datasetConfig = apiSource.datasets?.[dataset];
+    
+    // Get ID field for unique identifier
     const idField = this.getFieldMapping('id');
-    const titleField = this.getFieldMapping('title');
-    const statusField = this.getFieldMapping('status');
-    const submitDateField = this.getFieldMapping('submitDate');
-    const approvalDateField = this.getFieldMapping('approvalDate');
-    const valueField = this.getFieldMapping('value');
-    const descriptionField = this.getFieldMapping('description');
+    const id = idField ? data[idField] || 'unknown' : 'unknown';
+    
+    // Use dataset-specific description method
+    let description = 'Municipal Project';
+    if (datasetConfig?.getDescription) {
+      try {
+        description = datasetConfig.getDescription(data);
+      } catch (error) {
+        console.warn(`Error generating description for ${this.source.id}: ${error}`);
+        description = `${this.source.name} Record`;
+      }
+    }
 
     return {
-      id: `${this.source.id}-${idField ? data[idField] || 'unknown' : 'unknown'}`,
+      id: `${this.source.id}-${id}`,
       source: this.source.id,
-      type: 'permit',
-      title: titleField ? data[titleField] || 'Building Permit' : 'Building Permit',
-      address: this.buildAddress(data),
-      status: this.mapStatus(statusField ? data[statusField] : null),
-      submitDate: this.parseDate(submitDateField ? data[submitDateField] : null),
-      approvalDate: approvalDateField && data[approvalDateField] ? this.parseDate(data[approvalDateField]) : undefined,
-      value: valueField && data[valueField] ? parseFloat(data[valueField]) : undefined,
-      description: descriptionField ? data[descriptionField] : undefined,
+      description,
       rawData: data,
       lastUpdated: new Date()
     };
@@ -422,56 +444,4 @@ export class SocrataClient extends BaseMunicipalClient {
     }
   }
 
-  /**
-   * Parse date from various formats
-   */
-  private parseDate(dateString: string): Date {
-    if (!dateString) return new Date();
-    
-    // Try parsing as-is (works for ISO format)
-    const isoDate = new Date(dateString);
-    if (!isNaN(isoDate.getTime())) {
-      return isoDate;
-    }
-    
-    // Handle MM/DD/YYYY format (NYC)
-    const mmddyyyy = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (mmddyyyy) {
-      const [, month, day, year] = mmddyyyy;
-      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    }
-    
-    // Fallback to current date if parsing fails
-    console.warn(`Could not parse date: ${dateString}`);
-    return new Date();
-  }
-
-  /**
-   * Build normalized address
-   */
-  private buildAddress(data: any): string {
-    const parts = [
-      data.street_number,
-      data.street_name,
-      data.street_suffix
-    ].filter(Boolean);
-
-    return parts.join(' ') || data.address || 'Unknown Address';
-  }
-
-  /**
-   * Map source status to normalized status
-   */
-  private mapStatus(status: string): any {
-    if (!status) return 'pending';
-
-    const normalized = status.toLowerCase();
-    if (normalized.includes('issued') || normalized.includes('approved')) return 'approved';
-    if (normalized.includes('pending') || normalized.includes('filed')) return 'pending';
-    if (normalized.includes('complete')) return 'completed';
-    if (normalized.includes('expired')) return 'expired';
-    if (normalized.includes('cancelled')) return 'cancelled';
-
-    return 'under_review';
-  }
 }

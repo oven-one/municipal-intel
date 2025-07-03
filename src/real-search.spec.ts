@@ -33,9 +33,9 @@ test('Basic search works for all municipalities', async t => {
         const project = result.projects[0];
         t.is(project.source, municipalityId, `${municipalityId.toUpperCase()}: Project source should match municipality`);
         t.truthy(project.id, `${municipalityId.toUpperCase()}: Project should have ID`);
-        t.truthy(project.address, `${municipalityId.toUpperCase()}: Project should have address`);
-        t.truthy(project.status, `${municipalityId.toUpperCase()}: Project should have status`);
-        t.true(project.submitDate instanceof Date, `${municipalityId.toUpperCase()}: submitDate should be Date object`);
+        t.truthy(project.description, `${municipalityId.toUpperCase()}: Project should have description`);
+        t.is(typeof project.rawData, 'object', `${municipalityId.toUpperCase()}: Project should have rawData object`);
+        t.true(project.lastUpdated instanceof Date, `${municipalityId.toUpperCase()}: lastUpdated should be Date object`);
       }
 
       t.log(`✅ ${municipalityId.toUpperCase()}: Basic search works (${result.projects.length} projects returned)`);
@@ -68,11 +68,15 @@ test('Value filtering works for municipalities that support it', async t => {
       
       // Check that returned projects actually have values >= 50000
       for (const project of result.projects) {
-        if (project.value != null) {
-          t.true(
-            project.value >= 50000,
-            `${municipalityId.toUpperCase()}: Project value ${project.value} should be >= 50000`
-          );
+        // Check if rawData has value information
+        if (project.rawData.valuation != null || project.rawData.estimated_cost != null || project.rawData.value != null) {
+          const value = project.rawData.valuation || project.rawData.estimated_cost || project.rawData.value;
+          if (value && !isNaN(Number(value))) {
+            t.true(
+              Number(value) >= 50000,
+              `${municipalityId.toUpperCase()}: Project value ${value} should be >= 50000`
+            );
+          }
         }
       }
 
@@ -146,10 +150,27 @@ test('Date filtering works', async t => {
       
       // Check that returned projects have submit dates in range
       for (const project of result.projects) {
-        t.true(
-          project.submitDate >= fromDate && project.submitDate <= toDate,
-          `${municipalityId.toUpperCase()}: Project submit date should be in range`
-        );
+        // Check if rawData has date information
+        const dateFields = ['submitted_date', 'filing_date', 'permit_creation_date', 'filed_date'];
+        let hasValidDate = false;
+        
+        for (const field of dateFields) {
+          if (project.rawData[field]) {
+            const projectDate = new Date(project.rawData[field]);
+            if (!isNaN(projectDate.getTime())) {
+              t.true(
+                projectDate >= fromDate && projectDate <= toDate,
+                `${municipalityId.toUpperCase()}: Project ${field} should be within date range`
+              );
+              hasValidDate = true;
+              break;
+            }
+          }
+        }
+        
+        if (!hasValidDate) {
+          t.log(`${municipalityId.toUpperCase()}: Warning - No valid date field found in rawData for date filtering test`);
+        }
       }
 
       t.log(`✅ ${municipalityId.toUpperCase()}: Date filtering works (${result.projects.length} projects in 2024-2025)`);
@@ -182,11 +203,11 @@ test('Address filtering works', async t => {
 
       t.truthy(result, `${municipalityId.toUpperCase()}: Address search should return results`);
       
-      // Check that returned projects contain the address term
+      // Check that returned projects contain the address term in description
       for (const project of result.projects) {
         t.true(
-          project.address.toLowerCase().includes(address.toLowerCase()),
-          `${municipalityId.toUpperCase()}: Project address "${project.address}" should contain "${address}"`
+          project.description.toLowerCase().includes(address.toLowerCase()),
+          `${municipalityId.toUpperCase()}: Project description "${project.description}" should contain "${address}"`
         );
       }
 
