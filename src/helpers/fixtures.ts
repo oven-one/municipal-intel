@@ -9,6 +9,7 @@ export const sampleProjects: MunicipalProject[] = [
     id: 'sf-2024-001',
     source: 'sf',
     description: 'Residential Addition: Addition to single family home at 123 Main St, San Francisco, CA (Issued) $50,000 filed 1/15/2024',
+    url: 'https://municipal-intel.lineai.com/projects/sf/buildingPermits/2024-001',
     rawData: {
       permit_number: '2024-001',
       permit_type: 'Residential Addition',
@@ -27,6 +28,7 @@ export const sampleProjects: MunicipalProject[] = [
     id: 'sf-2024-002',
     source: 'sf',
     description: 'Commercial Renovation: Office space renovation at 456 Commercial Ave, San Francisco, CA (Under Review) $250,000 filed 1/20/2024',
+    url: 'https://municipal-intel.lineai.com/projects/sf/buildingPermits/2024-002',
     rawData: {
       permit_number: '2024-002',
       permit_type: 'Commercial Renovation',
@@ -44,6 +46,7 @@ export const sampleProjects: MunicipalProject[] = [
     id: 'nyc-2024-001',
     source: 'nyc',
     description: 'New Construction: New apartment building at 789 Broadway, Manhattan, New York, NY (Pending) $1,000,000 filed 1/25/2024',
+    url: 'https://municipal-intel.lineai.com/projects/nyc/dobPermitIssuance/2024-001',
     rawData: {
       permit_number: '2024-001',
       job_type: 'New Construction',
