@@ -73,6 +73,42 @@ export class MunicipalIntel {
   }
 
   /**
+   * Get a project by its URL
+   */
+  async getByUrl(url: string): Promise<MunicipalProject | null> {
+    const sourceId = this.extractSourceFromUrl(url);
+    if (!sourceId) {
+      throw new Error(`Cannot determine source from URL: ${url}`);
+    }
+
+    const source = this.registry.getSource(sourceId);
+    if (!source) {
+      throw new Error(`Source not found: ${sourceId}`);
+    }
+
+    const params: MunicipalSearchParams = { municipalityId: sourceId as any };
+    const client = this.clientFactory.createClient(source, params);
+    return client.getByUrl(url);
+  }
+
+  /**
+   * Extract source ID from municipal-intel URL
+   */
+  private extractSourceFromUrl(url: string): string | null {
+    try {
+      const urlObj = new URL(url);
+      // Expected format: /projects/{sourceId}/{datasetId}/{projectId}
+      const pathParts = urlObj.pathname.split('/');
+      if (pathParts.length >= 4 && pathParts[1] === 'projects') {
+        return pathParts[2]; // Return the sourceId part
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
    * Get available municipalities with their datasets (AI Discovery API)
    */
   getAvailableMunicipalities(): MunicipalityInfo[] {

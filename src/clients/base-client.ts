@@ -59,6 +59,11 @@ export abstract class BaseMunicipalClient {
   abstract getProject(id: string): Promise<MunicipalProject | null>;
 
   /**
+   * Get a project by its URL
+   */
+  abstract getByUrl(url: string): Promise<MunicipalProject | null>;
+
+  /**
    * Check if the data source is healthy
    */
   abstract healthCheck(): Promise<HealthCheck>;

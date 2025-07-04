@@ -122,6 +122,41 @@ export class SocrataClient extends BaseMunicipalClient {
   }
 
   /**
+   * Get a project by its URL
+   */
+  async getByUrl(url: string): Promise<MunicipalProject | null> {
+    try {
+      // Extract the ID from the URL
+      const id = this.extractIdFromUrl(url);
+      if (!id) {
+        return null;
+      }
+      
+      return this.getProject(id);
+    } catch (error) {
+      console.warn(`Error getting project by URL ${url}: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Extract project ID from a municipal-intel URL
+   */
+  private extractIdFromUrl(url: string): string | null {
+    try {
+      const urlObj = new URL(url);
+      // Expected format: /projects/{sourceId}/{datasetId}/{projectId}
+      const pathParts = urlObj.pathname.split('/');
+      if (pathParts.length >= 5 && pathParts[1] === 'projects') {
+        return pathParts[4]; // Return the project ID part
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
    * Get a specific project by ID
    */
   async getProject(id: string): Promise<MunicipalProject | null> {
@@ -340,9 +375,18 @@ export class SocrataClient extends BaseMunicipalClient {
       id: `${this.source.id}-${id}`,
       source: this.source.id,
       description,
+      url: this.generateProjectUrl(id),
       rawData: data,
       lastUpdated: new Date()
     };
+  }
+
+  /**
+   * Generate a project URL for accessing full details
+   */
+  private generateProjectUrl(id: string): string {
+    const datasetId = this.params.datasetId || this.source.api?.defaultDataset || 'default';
+    return `https://municipal-intel.lineai.com/projects/${this.source.id}/${datasetId}/${id}`;
   }
 
   /**

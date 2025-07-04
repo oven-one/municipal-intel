@@ -17,6 +17,8 @@ Access municipal planning applications, building permits, and construction activ
 ### Data Access
 - **Unified API**: Single interface for multiple municipal data sources
 - **Real-time Data**: Access live permit and planning application data
+- **Clean Project URLs**: Each project includes a shareable URL for direct access
+- **URL-based Retrieval**: Get projects directly by URL for bookmarking and sharing
 - **Transparent Adjustments**: Best-effort queries with clear reporting of any modifications
 - **Schema Validation**: Zod schemas ensure data consistency and catch API changes
 
@@ -77,8 +79,16 @@ const results = await municipal.search({
 console.log(`Found ${results.total} projects`);
 results.projects.forEach(project => {
   console.log(project.description); // Natural language description
+  console.log('Project URL:', project.url); // Clean, shareable URL
   console.log('Raw data:', project.rawData); // Full original data
 });
+
+// 🔗 Get project by URL (great for bookmarking/sharing)
+const projectUrl = 'https://municipal-intel.lineai.com/projects/sf/buildingPermits/2024-001';
+const project = await municipal.getByUrl(projectUrl);
+if (project) {
+  console.log('Retrieved project:', project.description);
+}
 
 // Check for any query adjustments
 if (results.adjustments.length > 0) {

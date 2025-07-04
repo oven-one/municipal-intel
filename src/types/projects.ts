@@ -80,6 +80,7 @@ export interface MunicipalProject {
   id: string;              // Unique identifier (prefixed with source)
   source: string;          // Municipality code (e.g., 'sf', 'nyc', 'la')
   description: string;     // Rich natural language description with full context
+  url: string;             // Direct URL to access this project's full details
   
   // Source data
   rawData: any;           // Complete original data from source API
