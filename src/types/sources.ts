@@ -3,12 +3,12 @@
  */
 
 import { z } from 'zod';
-import type { 
-  SFBuildingPermit, 
-  LACurrentBuildingPermit, 
-  LABuildingPermit, 
-  NYCDOBPermit, 
-  NYCDOBNowBuild 
+import type {
+  SFBuildingPermit,
+  LACurrentBuildingPermit,
+  LABuildingPermit,
+  NYCDOBPermit,
+  NYCDOBNowBuild
 } from '../schemas/api-responses';
 
 /**
@@ -34,11 +34,11 @@ export type Priority = 'high' | 'medium' | 'low';
 /**
  * Union type for all supported dataset record types
  */
-export type SocrataRecord = 
-  | SFBuildingPermit 
-  | LACurrentBuildingPermit 
-  | LABuildingPermit 
-  | NYCDOBPermit 
+export type SocrataRecord =
+  | SFBuildingPermit
+  | LACurrentBuildingPermit
+  | LABuildingPermit
+  | NYCDOBPermit
   | NYCDOBNowBuild;
 
 /**
@@ -79,8 +79,8 @@ export interface RateLimit {
 export interface ApiSource {
   type: ApiType;
   baseUrl: string;
-  datasets?: Record<string, SocrataDataset<any>>;
-  defaultDataset?: string;  // Which dataset to use by default
+  datasets: Record<string, SocrataDataset<any>>;
+  defaultDataset: string;  // Which dataset to use by default
   endpoints?: Record<string, string>;  // For custom APIs
   authentication?: ApiAuth;
   rateLimit?: RateLimit;
@@ -114,18 +114,18 @@ export interface MunicipalSource {
   name: string;          // Display name
   state: string;         // State code (CA, NY, FL)
   type: SourceType;      // How to access data
-  
+
   // Type-specific config
   api?: ApiSource;
   portal?: PortalSource;
   scraping?: ScrapingSource;
-  
+
   // Additional info
   urls?: Record<string, string>;  // Related URLs
   coverage?: string[];            // Areas covered
   updateFrequency?: string;       // How often updated
   priority: Priority;             // Implementation priority
-  
+
   // Runtime info
   enabled?: boolean;              // Is this source active?
   lastChecked?: string;           // Last health check (ISO string)
@@ -218,16 +218,16 @@ export const MunicipalSourceSchema = z.object({
   name: z.string(),
   state: z.string().length(2),
   type: z.enum(['api', 'portal', 'scraping']),
-  
+
   api: ApiSourceSchema.optional(),
   portal: PortalSourceSchema.optional(),
   scraping: ScrapingSourceSchema.optional(),
-  
+
   urls: z.record(z.string()).optional(),
   coverage: z.array(z.string()).optional(),
   updateFrequency: z.string().optional(),
   priority: z.enum(['high', 'medium', 'low']),
-  
+
   enabled: z.boolean().optional(),
   lastChecked: z.string().optional(),
   lastError: z.string().optional()
