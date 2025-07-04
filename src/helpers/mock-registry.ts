@@ -19,6 +19,7 @@ export const mockRegistryData: SourceRegistry = {
           api: {
             type: 'socrata',
             baseUrl: 'https://data.sfgov.org',
+            defaultDataset: 'buildingPermits',
             datasets: {
               buildingPermits: {
                 endpoint: '/resource/i98e-djp9.json',
@@ -44,7 +45,9 @@ export const mockRegistryData: SourceRegistry = {
           type: 'api',
           api: {
             type: 'custom',
-            baseUrl: 'https://data.lacity.org'
+            baseUrl: 'https://data.lacity.org',
+            defaultDataset: 'default',
+            datasets: {}
           },
           priority: 'medium'
         }
@@ -61,6 +64,7 @@ export const mockRegistryData: SourceRegistry = {
           api: {
             type: 'socrata',
             baseUrl: 'https://data.cityofnewyork.us',
+            defaultDataset: 'buildingPermits',
             datasets: {
               buildingPermits: {
                 endpoint: '/resource/ipu4-2q9a.json',
@@ -113,6 +117,7 @@ export const mockSources: MunicipalSource[] = [
     api: {
       type: 'socrata',
       baseUrl: 'https://data.sfgov.org',
+      defaultDataset: 'buildingPermits',
       datasets: {
         buildingPermits: {
           endpoint: '/resource/i98e-djp9.json',
@@ -132,7 +137,9 @@ export const mockSources: MunicipalSource[] = [
     type: 'api',
     api: {
       type: 'socrata',
-      baseUrl: 'https://data.cityofnewyork.us'
+      baseUrl: 'https://data.cityofnewyork.us',
+      defaultDataset: 'buildingPermits',
+      datasets: {}
     },
     priority: 'high'
   },
@@ -143,7 +150,9 @@ export const mockSources: MunicipalSource[] = [
     type: 'api',
     api: {
       type: 'custom',
-      baseUrl: 'https://data.lacity.org'
+      baseUrl: 'https://data.lacity.org',
+      defaultDataset: 'default',
+      datasets: {}
     },
     priority: 'medium'
   },

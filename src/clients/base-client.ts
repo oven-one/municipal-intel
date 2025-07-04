@@ -2,7 +2,7 @@
  * Base client interface for municipal data sources
  */
 
-import { MunicipalProject, MunicipalSearchParams, MunicipalSearchResponse } from '../types/projects';
+import { MunicipalProject, MunicipalSearchResponse } from '../types/projects';
 import { MunicipalSource } from '../types/sources';
 
 /**
@@ -51,7 +51,7 @@ export abstract class BaseMunicipalClient {
   /**
    * Search for municipal projects
    */
-  abstract search(params: MunicipalSearchParams): Promise<MunicipalSearchResponse>;
+  abstract search(): Promise<MunicipalSearchResponse>;
 
   /**
    * Get a specific project by ID

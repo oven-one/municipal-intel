@@ -4,12 +4,12 @@
  */
 
 import { SourceRegistry, SocrataRecord } from '../types/sources';
-import type { 
-  SFBuildingPermit, 
-  LACurrentBuildingPermit, 
-  LABuildingPermit, 
-  NYCDOBPermit, 
-  NYCDOBNowBuild 
+import type {
+  SFBuildingPermit,
+  LACurrentBuildingPermit,
+  LABuildingPermit,
+  NYCDOBPermit,
+  NYCDOBNowBuild
 } from '../schemas/api-responses';
 
 export const builtInRegistry: SourceRegistry = {
@@ -104,18 +104,18 @@ export const builtInRegistry: SourceRegistry = {
                 },
                 getDescription: (data: SFBuildingPermit) => {
                   const parts = [];
-                  
+
                   // Permit type and description
                   if (data.permit_type) parts.push(data.permit_type);
                   if (data.description) parts.push(data.description);
-                  
+
                   // Address with full context
                   const addressParts = [data.street_number, data.street_name, data.street_suffix].filter(Boolean);
                   if (addressParts.length > 0) {
                     const address = addressParts.join(' ');
                     parts.push(`at ${address}, San Francisco, CA${data.zipcode ? ` ${data.zipcode}` : ''}`);
                   }
-                  
+
                   // Status and cost
                   const statusInfo = [];
                   if (data.status) statusInfo.push(`(${data.status})`);
@@ -123,7 +123,7 @@ export const builtInRegistry: SourceRegistry = {
                     statusInfo.push(`$${Number(data.revised_cost).toLocaleString()}`);
                   }
                   if (statusInfo.length > 0) parts.push(statusInfo.join(' '));
-                  
+
                   // Filing date
                   if (data.permit_creation_date) {
                     try {
@@ -133,7 +133,7 @@ export const builtInRegistry: SourceRegistry = {
                       // Skip invalid dates
                     }
                   }
-                  
+
                   return parts.filter(Boolean).join(' ') || 'San Francisco Building Permit';
                 }
               },
@@ -154,7 +154,7 @@ export const builtInRegistry: SourceRegistry = {
                 getDescription: (data: SocrataRecord) => {
                   const anyData = data as any;
                   const parts = [];
-                  
+
                   if (anyData.project_name) parts.push(anyData.project_name);
                   if (anyData.project_address) {
                     parts.push(`at ${anyData.project_address}, San Francisco, CA`);
@@ -168,7 +168,7 @@ export const builtInRegistry: SourceRegistry = {
                       // Skip invalid dates
                     }
                   }
-                  
+
                   return parts.filter(Boolean).join(' ') || 'San Francisco Planning Application';
                 }
               }
@@ -261,20 +261,20 @@ export const builtInRegistry: SourceRegistry = {
                 },
                 getDescription: (data: LACurrentBuildingPermit) => {
                   const parts = [];
-                  
+
                   // Permit type and subtype
                   if (data.permit_sub_type) parts.push(data.permit_sub_type);
                   if (data.permit_type) parts.push(data.permit_type);
-                  
+
                   // Work description
                   if (data.work_desc) parts.push(`${data.work_desc}`);
-                  
+
                   // Address with full context
                   if (data.primary_address) {
                     const address = `at ${data.primary_address}, Los Angeles, CA${data.zip_code ? ` ${data.zip_code}` : ''}`;
                     parts.push(address);
                   }
-                  
+
                   // Cost and status
                   const statusInfo = [];
                   if (data.valuation && !isNaN(Number(data.valuation))) {
@@ -282,7 +282,7 @@ export const builtInRegistry: SourceRegistry = {
                   }
                   if (data.status_desc) statusInfo.push(data.status_desc);
                   if (statusInfo.length > 0) parts.push(statusInfo.join(' '));
-                  
+
                   // Submit date
                   if (data.submitted_date) {
                     try {
@@ -292,7 +292,7 @@ export const builtInRegistry: SourceRegistry = {
                       // Skip invalid dates
                     }
                   }
-                  
+
                   return parts.filter(Boolean).join(' ') || 'Los Angeles Building Permit';
                 }
               },
@@ -369,13 +369,13 @@ export const builtInRegistry: SourceRegistry = {
                 },
                 getDescription: (data: LABuildingPermit) => {
                   const parts = [];
-                  
+
                   // Permit type
                   if (data.permit_type) parts.push(data.permit_type);
-                  
+
                   // Work description
                   if (data.work_description) parts.push(`${data.work_description}`);
-                  
+
                   // Address with full context
                   const addressParts = [
                     data.address_start,
@@ -387,7 +387,7 @@ export const builtInRegistry: SourceRegistry = {
                     const address = `at ${addressParts.join(' ')}, Los Angeles, CA${data.zip_code ? ` ${data.zip_code}` : ''}`;
                     parts.push(address);
                   }
-                  
+
                   // Cost and status
                   const statusInfo = [];
                   if (data.latest_status) statusInfo.push(`(${data.latest_status})`);
@@ -395,7 +395,7 @@ export const builtInRegistry: SourceRegistry = {
                     statusInfo.push(`$${Number(data.valuation).toLocaleString()}`);
                   }
                   if (statusInfo.length > 0) parts.push(statusInfo.join(' '));
-                  
+
                   // Issue date
                   if (data.issue_date) {
                     try {
@@ -405,7 +405,7 @@ export const builtInRegistry: SourceRegistry = {
                       // Skip invalid dates
                     }
                   }
-                  
+
                   return parts.filter(Boolean).join(' ') || 'Los Angeles Building Permit (Legacy)';
                 }
               }
@@ -431,9 +431,6 @@ export const builtInRegistry: SourceRegistry = {
               dobPermitIssuance: {
                 endpoint: "/resource/ipu4-2q9a.json",
                 name: "DOB Permit Issuance",
-                // Original fields array - many fields were incorrect
-                // fields: ["job__", "doc__", "borough", "house__", "street_name", "block", "lot", "bin__", "job_type", "job_status", "job_status_descrp", "filing_date", "issuance_date", "expiration_date", "permit_status", "permit_type", "owner_s_first_name", "owner_s_last_name", "owner_s_business_name", "filing_representative_first_name", "filing_representative_last_name", "filing_representative_business_name", "permit_si_no", "latitude", "longitude", "council_district", "census_tract", "nta", "community_board"],
-                // Actual fields from API dump - all are consistently present
                 fields: [
                   "bin__",
                   "bldg_type",
@@ -496,10 +493,10 @@ export const builtInRegistry: SourceRegistry = {
                 },
                 getDescription: (data: NYCDOBPermit) => {
                   const parts = [];
-                  
+
                   // Job type (main permit type)
                   if (data.job_type) parts.push(data.job_type);
-                  
+
                   // Address with full context
                   const addressParts = [data.house__, data.street_name].filter(Boolean);
                   if (addressParts.length > 0) {
@@ -511,10 +508,10 @@ export const builtInRegistry: SourceRegistry = {
                       parts.push(`at ${location}`);
                     }
                   }
-                  
+
                   // Status
                   if (data.permit_status) parts.push(`(${data.permit_status})`);
-                  
+
                   // Filing date
                   if (data.filing_date) {
                     try {
@@ -524,16 +521,13 @@ export const builtInRegistry: SourceRegistry = {
                       // Skip invalid dates
                     }
                   }
-                  
+
                   return parts.filter(Boolean).join(' ') || 'New York City DOB Permit';
                 }
               },
               dobNowBuildApproved: {
                 endpoint: "/resource/rbx6-tga4.json",
                 name: "DOB NOW: Build – Approved Permits",
-                // Original fields array - most fields were incorrect or missing
-                // fields: ["job_filing_number", "doc_number", "job_type", "approval_date", "job_status", "permit_status", "permit_type", "filing_date", "issuance_date", "expiration_date", "estimated_job_cost", "borough", "bin", "house_number", "street_name", "block", "lot", "community_board", "owner_name", "owner_business_name"],
-                // Actual fields from API dump + sample data (UNION of both)
                 fields: [
                   "applicant_business_address",
                   "applicant_business_name",
@@ -583,10 +577,10 @@ export const builtInRegistry: SourceRegistry = {
                 },
                 getDescription: (data: NYCDOBNowBuild) => {
                   const parts = [];
-                  
+
                   // Job description
                   if (data.job_description) parts.push(data.job_description);
-                  
+
                   // Address with full context
                   const addressParts = [data.house_no, data.street_name].filter(Boolean);
                   if (addressParts.length > 0) {
@@ -594,7 +588,7 @@ export const builtInRegistry: SourceRegistry = {
                     const location = data.borough ? `${address}, ${data.borough}, New York, NY` : `${address}, New York, NY`;
                     parts.push(`at ${location}`);
                   }
-                  
+
                   // Cost and status
                   const statusInfo = [];
                   if (data.estimated_job_costs && !isNaN(Number(data.estimated_job_costs))) {
@@ -602,7 +596,7 @@ export const builtInRegistry: SourceRegistry = {
                   }
                   if (data.work_permit) statusInfo.push(data.work_permit);
                   if (statusInfo.length > 0) parts.push(statusInfo.join(' '));
-                  
+
                   // Issue/approval date
                   if (data.issued_date) {
                     try {
@@ -619,7 +613,7 @@ export const builtInRegistry: SourceRegistry = {
                       // Skip invalid dates
                     }
                   }
-                  
+
                   return parts.filter(Boolean).join(' ') || 'New York City DOB NOW Build Permit';
                 }
               },
@@ -640,15 +634,15 @@ export const builtInRegistry: SourceRegistry = {
                 getDescription: (data: SocrataRecord) => {
                   const anyData = data as any;
                   const parts = [];
-                  
+
                   // Project name
                   if (anyData.project_name) parts.push(anyData.project_name);
-                  
+
                   // Location
                   if (anyData.borough) {
                     parts.push(`in ${anyData.borough}, New York, NY`);
                   }
-                  
+
                   // Project details
                   const details = [];
                   if (anyData.construction_type) details.push(anyData.construction_type.toLowerCase());
@@ -666,7 +660,7 @@ export const builtInRegistry: SourceRegistry = {
                     details.push(`${Number(anyData.total_units).toLocaleString()} units`);
                   }
                   if (details.length > 0) parts.push(details.join(', '));
-                  
+
                   // Completion date
                   if (anyData.expected_completion_date) {
                     try {
@@ -676,7 +670,7 @@ export const builtInRegistry: SourceRegistry = {
                       // Skip invalid dates
                     }
                   }
-                  
+
                   return parts.filter(Boolean).join(': ').replace(': : ', ': ') || 'New York City Major Construction Project';
                 }
               }

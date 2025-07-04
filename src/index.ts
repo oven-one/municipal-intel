@@ -1,7 +1,7 @@
 /**
  * @lineai/municipal-intel
- * 
- * Access municipal planning applications, building permits, and construction 
+ *
+ * Access municipal planning applications, building permits, and construction
  * activity data from major US cities.
  */
 
@@ -17,7 +17,7 @@ export * from './registry';
 // Main API class
 import { ClientFactory, ClientFactoryConfig } from './clients';
 import { sourceRegistry, SourceRegistryManager } from './registry';
-import { MunicipalSource, MunicipalProject, MunicipalSearchParams, MunicipalSearchResponse, MunicipalityInfo, SearchCapabilities, FieldSchema, KnownMunicipalityId } from './types';
+import { FieldSchema, KnownMunicipalityId, MunicipalityInfo, MunicipalProject, MunicipalSearchParams, MunicipalSearchResponse, MunicipalSource, SearchCapabilities } from './types';
 
 /**
  * Main municipal intelligence API
@@ -53,8 +53,8 @@ export class MunicipalIntel {
       source = sources[0];
     }
 
-    const client = this.clientFactory.createClient(source);
-    return client.search(params);
+    const client = this.clientFactory.createClient(source, params);
+    return client.search();
   }
 
   /**
@@ -66,7 +66,9 @@ export class MunicipalIntel {
       throw new Error(`Source not found: ${sourceId}`);
     }
 
-    const client = this.clientFactory.createClient(source);
+    // Create minimal params for getProject - we only need the municipalityId
+    const params: MunicipalSearchParams = { municipalityId: sourceId as any };
+    const client = this.clientFactory.createClient(source, params);
     return client.getProject(projectId);
   }
 
@@ -75,12 +77,12 @@ export class MunicipalIntel {
    */
   getAvailableMunicipalities(): MunicipalityInfo[] {
     const sources = this.registry.getAllSources();
-    
+
     return sources.map(source => ({
       id: source.id as KnownMunicipalityId,
       name: source.name,
       state: source.state,
-      datasets: source.api?.datasets 
+      datasets: source.api?.datasets
         ? Object.entries(source.api.datasets).map(([id, dataset]) => ({
             id,
             name: dataset.name
@@ -113,7 +115,7 @@ export class MunicipalIntel {
       } else {
         limitations.push('No value field available - minValue/maxValue filters not supported');
       }
-      
+
       // Check if approval date is available
       if (primaryDataset?.fieldMappings?.approvalDate) {
         supportedFilters.push('approvalDateFrom', 'approvalDateTo');
@@ -138,10 +140,10 @@ export class MunicipalIntel {
     }
 
     // Get the specified dataset or the first one
-    const dataset = datasetId 
+    const dataset = datasetId
       ? source.api.datasets[datasetId]
       : Object.values(source.api.datasets)[0];
-      
+
     if (!dataset) {
       throw new Error(`Dataset not found: ${datasetId || 'default'}`);
     }
@@ -152,7 +154,7 @@ export class MunicipalIntel {
 
     return dataset.fields.map(fieldName => {
       const isSearchable = Object.values(fieldMappings).includes(fieldName);
-      
+
       // Determine field type based on field name patterns
       let type: any = 'string';
       if (fieldName.includes('date') || fieldName.includes('_date')) {
@@ -165,7 +167,7 @@ export class MunicipalIntel {
         name: fieldName,
         type,
         searchable: isSearchable,
-        description: isSearchable 
+        description: isSearchable
           ? `Searchable field mapped to: ${searchableLogicalFields.find(logical => fieldMappings[logical] === fieldName)}`
           : undefined
       };
@@ -187,15 +189,15 @@ export class MunicipalIntel {
       const filterState = filters.state.toLowerCase();
       sources = sources.filter(s => s.state.toLowerCase() === filterState);
     }
-    
+
     if (filters?.type) {
       sources = sources.filter(s => s.type === filters.type);
     }
-    
+
     if (filters?.priority) {
       sources = sources.filter(s => s.priority === filters.priority);
     }
-    
+
     if (filters?.enabled !== undefined) {
       sources = sources.filter(s => (s.enabled !== false) === filters.enabled);
     }
@@ -203,26 +205,26 @@ export class MunicipalIntel {
     return sources;
   }
 
-  /**
-   * Check health of a specific source
-   */
-  async healthCheck(sourceId: string) {
-    const source = this.registry.getSource(sourceId);
-    if (!source) {
-      throw new Error(`Source not found: ${sourceId}`);
-    }
-
-    const client = this.clientFactory.createClient(source);
-    const health = await client.healthCheck();
-    
-    // Update registry with health info
-    this.registry.updateSourceStatus(sourceId, {
-      lastChecked: health.lastChecked.toISOString(),
-      lastError: health.status === 'unhealthy' ? health.error : undefined
-    });
-
-    return health;
-  }
+  // /**
+  //  * Check health of a specific source
+  //  */
+  // async healthCheck(sourceId: string) {
+  //   const source = this.registry.getSource(sourceId);
+  //   if (!source) {
+  //     throw new Error(`Source not found: ${sourceId}`);
+  //   }
+  //
+  //   const client = this.clientFactory.createClient(source);
+  //   const health = await client.healthCheck();
+  //
+  //   // Update registry with health info
+  //   this.registry.updateSourceStatus(sourceId, {
+  //     lastChecked: health.lastChecked.toISOString(),
+  //     lastError: health.status === 'unhealthy' ? health.error : undefined
+  //   });
+  //
+  //   return health;
+  // }
 
   /**
    * Set universal Socrata authentication token

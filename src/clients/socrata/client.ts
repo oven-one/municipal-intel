@@ -4,9 +4,10 @@
  */
 
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { BaseMunicipalClient, BaseClientConfig, HealthCheck, MunicipalDataError, RateLimitError } from '../base-client';
+
 import { MunicipalProject, MunicipalSearchParams, MunicipalSearchResponse } from '../../types/projects';
-import { ApiSource } from '../../types/sources';
+import { SocrataDataset } from '../../types/sources';
+import { BaseClientConfig, BaseMunicipalClient, HealthCheck, MunicipalDataError, RateLimitError } from '../base-client';
 
 /**
  * Socrata-specific configuration
@@ -32,12 +33,13 @@ export interface SoQLQuery {
  * Socrata API client
  */
 export class SocrataClient extends BaseMunicipalClient {
-  private api: AxiosInstance;
-  private appToken?: string;
-  private requestCount: number = 0;
-  private resetTime: number = Date.now() + 3600000; // 1 hour from now
+  private readonly api: AxiosInstance;
+  private readonly appToken?: string;
+  private readonly resetTime: number = Date.now() + 60000; // 1 minute from now
+  private readonly datasetConfig: SocrataDataset; // Current dataset configuration
+  private readonly params: MunicipalSearchParams;
 
-  constructor(config: SocrataClientConfig) {
+  constructor(config: SocrataClientConfig, params: MunicipalSearchParams) {
     super(config);
 
     if (!this.source.api || this.source.api.type !== 'socrata') {
@@ -45,6 +47,10 @@ export class SocrataClient extends BaseMunicipalClient {
     }
 
     this.appToken = config.appToken;
+    this.params = params;
+    // const apiSource = this.source.api as ApiSource;
+    this.datasetConfig = this.source.api.datasets[params.datasetId || this.source.api.defaultDataset];
+
 
     // Create axios instance
     this.api = axios.create({
@@ -59,7 +65,6 @@ export class SocrataClient extends BaseMunicipalClient {
     // Add response interceptor for error handling
     this.api.interceptors.response.use(
       (response) => {
-        this.requestCount++;
         return response;
       },
       (error) => {
@@ -80,24 +85,9 @@ export class SocrataClient extends BaseMunicipalClient {
   /**
    * Execute a SoQL query against a dataset
    */
-  async query(dataset: string, params: SoQLQuery = {}): Promise<any[]> {
-    // Check rate limits
-    await this.checkRateLimit();
-
-    const apiSource = this.source.api as ApiSource;
-    const datasetConfig = apiSource.datasets?.[dataset];
-
-    if (!datasetConfig) {
-      throw new MunicipalDataError(
-        `Dataset "${dataset}" not configured for source ${this.source.id}`,
-        this.source.id
-      );
-    }
-
-    this.log(`Querying dataset: ${dataset}`, params);
-
-    const response: AxiosResponse = await this.api.get(datasetConfig.endpoint, {
-      params: this.cleanParams(params)
+  private async query(sq: SoQLQuery = {}): Promise<any[]> {
+    const response: AxiosResponse = await this.api.get(this.datasetConfig.endpoint, {
+      params: this.cleanParams(sq)
     });
 
     this.log(`Retrieved ${response.data.length} records`);
@@ -107,42 +97,26 @@ export class SocrataClient extends BaseMunicipalClient {
   /**
    * Search for municipal projects
    */
-  async search(params: MunicipalSearchParams): Promise<MunicipalSearchResponse> {
+  async search(): Promise<MunicipalSearchResponse> {
     const adjustments: string[] = [];
-    const soqlQuery = this.buildSoQLQuery(params, adjustments);
-    
-    // Use specified dataset or fall back to default
-    let dataset: string;
-    if (params.datasetId) {
-      const apiSource = this.source.api as ApiSource;
-      if (!apiSource.datasets?.[params.datasetId]) {
-        throw new MunicipalDataError(
-          `Dataset '${params.datasetId}' not found for ${this.source.id}. Available: ${Object.keys(apiSource.datasets || {}).join(', ')}`,
-          this.source.id
-        );
-      }
-      dataset = params.datasetId;
-    } else {
-      dataset = this.getPrimaryDataset();
-    }
-
-    const data = await this.query(dataset, soqlQuery);
+    const soqlQuery = this.buildSoQLQuery(adjustments);
+    const data = await this.query(soqlQuery);
     const projects = data.map(item => this.normalizeProject(item));
 
     // Get total count if needed
     let total = projects.length;
-    if (params.limit && projects.length === params.limit) {
+    if (this.params.limit && projects.length === this.params.limit) {
       const countQuery = { ...soqlQuery, $select: 'count(*) as total', $limit: 1, $order: undefined };
-      const countResult = await this.query(dataset, countQuery);
+      const countResult = await this.query(countQuery);
       total = parseInt(countResult[0]?.total || '0');
     }
 
     return {
       projects,
       total,
-      page: Math.floor((params.offset || 0) / (params.limit || 100)) + 1,
-      pageSize: params.limit || 100,
-      hasMore: total > (params.offset || 0) + projects.length,
+      page: Math.floor((this.params.offset || 0) / (this.params.limit || 100)) + 1,
+      pageSize: this.params.limit || 100,
+      hasMore: total > (this.params.offset || 0) + projects.length,
       adjustments
     };
   }
@@ -151,7 +125,6 @@ export class SocrataClient extends BaseMunicipalClient {
    * Get a specific project by ID
    */
   async getProject(id: string): Promise<MunicipalProject | null> {
-    const dataset = this.getPrimaryDataset();
     const idField = this.getIdField();
 
     if (!idField) {
@@ -166,39 +139,14 @@ export class SocrataClient extends BaseMunicipalClient {
       $limit: 1
     };
 
-    const data = await this.query(dataset, query);
+    const data = await this.query(query);
     return data.length > 0 ? this.normalizeProject(data[0]) : null;
-  }
-
-  /**
-   * Health check
-   */
-  async healthCheck(): Promise<HealthCheck> {
-    const startTime = Date.now();
-
-    try {
-      const dataset = this.getPrimaryDataset();
-      await this.query(dataset, { $limit: 1 });
-
-      return {
-        status: 'healthy',
-        latency: Date.now() - startTime,
-        lastChecked: new Date()
-      };
-    } catch (error: any) {
-      return {
-        status: 'unhealthy',
-        error: error.message,
-        lastChecked: new Date()
-      };
-    }
   }
 
   /**
    * Get available project types
    */
   async getAvailableTypes(): Promise<string[]> {
-    const dataset = this.getPrimaryDataset();
     const typeField = this.getTypeField();
 
     if (!typeField) return [];
@@ -208,17 +156,46 @@ export class SocrataClient extends BaseMunicipalClient {
       $limit: 1000
     };
 
-    const data = await this.query(dataset, query);
+    const data = await this.query(query);
     return data.map(item => item[typeField]).filter(Boolean);
+  }
+
+  /**
+   * Check if the data source is healthy
+   */
+  async healthCheck(): Promise<HealthCheck> {
+    const startTime = Date.now();
+    
+    try {
+      // Simple health check - try to fetch one record
+      const query: SoQLQuery = { $limit: 1 };
+      await this.query(query);
+      
+      const latency = Date.now() - startTime;
+      return {
+        status: 'healthy',
+        latency,
+        lastChecked: new Date()
+      };
+    } catch (error: any) {
+      const latency = Date.now() - startTime;
+      return {
+        status: 'unhealthy',
+        latency,
+        error: error.message,
+        lastChecked: new Date()
+      };
+    }
   }
 
   /**
    * Build SoQL query from search parameters
    */
-  private buildSoQLQuery(params: MunicipalSearchParams, adjustments: string[] = []): SoQLQuery {
+  private buildSoQLQuery(adjustments: string[] = []): SoQLQuery {
+    const params = this.params;
     const query: SoQLQuery = {
       $limit: params.limit || 100,
-      $offset: params.offset || 0,
+      $offset: this.params.offset || 0,
       $order: this.buildOrderClause(params)
     };
 
@@ -291,65 +268,16 @@ export class SocrataClient extends BaseMunicipalClient {
   }
 
   /**
-   * Check rate limits and wait if necessary
-   */
-  private async checkRateLimit(): Promise<void> {
-    // Reset counter every hour
-    if (Date.now() > this.resetTime) {
-      this.requestCount = 0;
-      this.resetTime = Date.now() + 3600000;
-    }
-
-    // Check if we're approaching the limit
-    const limit = this.appToken ? 900 : 100; // Leave buffer
-    if (this.requestCount >= limit) {
-      const waitTime = this.resetTime - Date.now();
-      this.log(`Rate limit reached. Waiting ${waitTime}ms`);
-      await this.sleep(waitTime);
-      this.requestCount = 0;
-      this.resetTime = Date.now() + 3600000;
-    }
-  }
-
-  /**
    * Clean query parameters (remove undefined values)
    */
-  private cleanParams(params: any): any {
+  private cleanParams(sq: SoQLQuery): any {
     const cleaned: any = {};
-    for (const [key, value] of Object.entries(params)) {
+    for (const [key, value] of Object.entries(sq)) {
       if (value !== undefined && value !== null) {
         cleaned[key] = value;
       }
     }
     return cleaned;
-  }
-
-  /**
-   * Get the primary dataset for this source
-   */
-  private getPrimaryDataset(): string {
-    const apiSource = this.source.api as ApiSource;
-    const datasets = apiSource.datasets;
-
-    if (!datasets) {
-      throw new MunicipalDataError(`No datasets configured for ${this.source.id}`, this.source.id);
-    }
-
-    if (!apiSource.defaultDataset) {
-      throw new MunicipalDataError(
-        `No defaultDataset specified for ${this.source.id}. Please add defaultDataset to the API configuration.`,
-        this.source.id
-      );
-    }
-
-    if (!datasets[apiSource.defaultDataset]) {
-      throw new MunicipalDataError(
-        `Default dataset '${apiSource.defaultDataset}' not found in datasets for ${this.source.id}. Available: ${Object.keys(datasets).join(', ')}`,
-        this.source.id
-      );
-    }
-
-    return apiSource.defaultDataset;
   }
 
   /**
@@ -371,10 +299,7 @@ export class SocrataClient extends BaseMunicipalClient {
    * Get field mapping for this source (returns null if missing)
    */
   private getFieldMapping(logicalField: string): string | null {
-    const dataset = this.getPrimaryDataset();
-    const apiSource = this.source.api as ApiSource;
-    const datasetConfig = apiSource.datasets?.[dataset];
-    const mappings = datasetConfig?.fieldMappings;
+    const mappings = this.datasetConfig?.fieldMappings;
     return mappings?.[logicalField] || null;
   }
 
@@ -382,11 +307,11 @@ export class SocrataClient extends BaseMunicipalClient {
   private getIdField(): string | null { return this.getFieldMapping('id'); }
   private getTypeField(): string | null { return this.getFieldMapping('title'); }
   private getDateField(type: 'submit' | 'approval'): string | null {
-    return type === 'submit' 
-      ? this.getFieldMapping('submitDate') 
+    return type === 'submit'
+      ? this.getFieldMapping('submitDate')
       : this.getFieldMapping('approvalDate');
   }
-  private getValueField(): string | null { 
+  private getValueField(): string | null {
     return this.getFieldMapping('value');
   }
   private getStatusField(): string | null { return this.getFieldMapping('status'); }
@@ -396,19 +321,15 @@ export class SocrataClient extends BaseMunicipalClient {
    * Normalize raw data to MunicipalProject using dataset-specific description
    */
   private normalizeProject(data: any): MunicipalProject {
-    const dataset = this.getPrimaryDataset();
-    const apiSource = this.source.api as ApiSource;
-    const datasetConfig = apiSource.datasets?.[dataset];
-    
     // Get ID field for unique identifier
     const idField = this.getFieldMapping('id');
     const id = idField ? data[idField] || 'unknown' : 'unknown';
-    
+
     // Use dataset-specific description method
     let description = 'Municipal Project';
-    if (datasetConfig?.getDescription) {
+    if (this.datasetConfig?.getDescription) {
       try {
-        description = datasetConfig.getDescription(data);
+        description = this.datasetConfig.getDescription(data);
       } catch (error) {
         console.warn(`Error generating description for ${this.source.id}: ${error}`);
         description = `${this.source.name} Record`;
@@ -435,7 +356,7 @@ export class SocrataClient extends BaseMunicipalClient {
         this.source.id
       );
     }
-    
+
     if (isNaN(dateParam.getTime())) {
       throw new MunicipalDataError(
         `Invalid ${paramName}: Date object contains invalid date. Check your date values.`,
